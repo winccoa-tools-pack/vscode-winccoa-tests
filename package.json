@@ -47,26 +47,42 @@
     "configuration": {
       "title": "WinCC OA Test Explorer",
       "properties": {
-        "winccoaTests.testFilesPattern": {
-          "type": "string",
-          "default": "**/*_test.ctl",
-          "description": "Glob pattern to discover WinCC OA test files"
-        },
-        "winccoaTests.winccoaBinPath": {
-          "type": "string",
-          "default": "",
-          "description": "Path to WinCC OA bin directory (e.g., C:\\Siemens\\Automation\\WinCC_OA\\3.19\\bin)"
-        },
         "winccoaTests.logLevel": {
           "type": "string",
           "enum": [
             "ERROR",
             "WARN",
             "INFO",
-            "DEBUG"
+            "DEBUG",
+            "TRACE"
           ],
           "default": "INFO",
-          "description": "Logging level for extension output"
+          "description": "Logging level for extension output",
+          "enumDescriptions": [
+            "Only critical errors",
+            "Errors and warnings",
+            "General information, errors and warnings (recommended)",
+            "Detailed debugging information",
+            "Very verbose trace information (for troubleshooting)"
+          ]
+        },
+        "winccoaTests.logPathSource": {
+          "type": "string",
+          "enum": [
+            "workspace",
+            "static"
+          ],
+          "default": "workspace",
+          "description": "How to determine the log directory path",
+          "enumDescriptions": [
+            "Derive path from workspace root (workspace/log)",
+            "Use a static path configured in settings"
+          ]
+        },
+        "winccoaTests.staticLogPath": {
+          "type": "string",
+          "default": "",
+          "description": "Static log directory path (used when logPathSource is 'static'). Example: C:\\WinCC_OA\\MyProject\\log or /opt/WinCC_OA/MyProject/log"
         }
       }
     }

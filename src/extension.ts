@@ -1,34 +1,42 @@
 import * as vscode from 'vscode';
 import { WinCCOATestController } from './testController';
+import { ExtensionOutputChannel } from './extensionOutput';
 
 let testController: WinCCOATestController | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('WinCC OA Test Explorer is now active');
-
-    // Create output channel for logging
-    const outputChannel = vscode.window.createOutputChannel('WinCC OA Tests');
-    outputChannel.appendLine('WinCC OA Test Explorer activated');
+    // Initialize extension output channel
+    ExtensionOutputChannel.initialize();
+    ExtensionOutputChannel.info('Extension', 'WinCC OA Test Explorer activating...');
 
     // Initialize Test Controller
-    testController = new WinCCOATestController(context, outputChannel);
+    testController = new WinCCOATestController(context);
     
     // Register commands
     context.subscriptions.push(
         vscode.commands.registerCommand('winccoa-tests.refreshTests', () => {
-            outputChannel.appendLine('Refreshing tests...');
+            ExtensionOutputChannel.info('Extension', 'Refreshing tests...');
             testController?.refreshTests();
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand('winccoa-tests.runAllTests', () => {
-            outputChannel.appendLine('Running all tests...');
+            ExtensionOutputChannel.info('Extension', 'Running all tests...');
             testController?.runAllTests();
         })
     );
 
-    outputChannel.appendLine('WinCC OA Test Explorer ready');
+    // Listen for configuration changes
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('winccoaTests.logLevel')) {
+                ExtensionOutputChannel.updateLogLevel();
+            }
+        })
+    );
+
+    ExtensionOutputChannel.success('Extension', 'WinCC OA Test Explorer activated and ready');
 }
 
 export function deactivate() {

@@ -1,17 +1,18 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { ExtensionOutputChannel } from './extensionOutput';
 
 /**
  * Main Test Controller for WinCC OA Tests
  * Integrates with VS Code Test Explorer API
  */
 export class WinCCOATestController {
+    private static readonly LOG_SOURCE = 'TestController';
     private testController: vscode.TestController;
     private fileWatcher: vscode.FileSystemWatcher | undefined;
 
     constructor(
-        private context: vscode.ExtensionContext,
-        private outputChannel: vscode.OutputChannel
+        private context: vscode.ExtensionContext
     ) {
         // Create Test Controller
         this.testController = vscode.tests.createTestController(
@@ -40,20 +41,20 @@ export class WinCCOATestController {
      * Discover tests in workspace
      */
     private async discoverTests(): Promise<void> {
-        this.outputChannel.appendLine('Discovering WinCC OA test files...');
+        ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Discovering WinCC OA test files...');
 
         const config = vscode.workspace.getConfiguration('winccoaTests');
         const pattern = config.get<string>('testFilesPattern', '**/*_test.ctl');
 
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
-            this.outputChannel.appendLine('No workspace folder found');
+            ExtensionOutputChannel.warn(WinCCOATestController.LOG_SOURCE, 'No workspace folder found');
             return;
         }
 
         // Find all test files
         const files = await vscode.workspace.findFiles(pattern);
-        this.outputChannel.appendLine(`Found ${files.length} test file(s)`);
+        ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Found ${files.length} test file(s)`);
 
         // Clear existing tests
         this.testController.items.replace([]);
@@ -71,7 +72,7 @@ export class WinCCOATestController {
         const fileName = path.basename(fileUri.fsPath);
         const testId = fileUri.toString();
 
-        this.outputChannel.appendLine(`Creating test item for: ${fileName}`);
+        ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Creating test item for: ${fileName}`);
 
         // Create a test item for the file
         const testItem = this.testController.createTestItem(
@@ -111,7 +112,7 @@ export class WinCCOATestController {
             this.testController.items.forEach(test => queue.push(test));
         }
 
-        this.outputChannel.appendLine(`Running ${queue.length} test(s)...`);
+        ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Running ${queue.length} test(s)...`);
 
         // Run each test
         for (const test of queue) {
@@ -121,7 +122,7 @@ export class WinCCOATestController {
             }
 
             run.started(test);
-            this.outputChannel.appendLine(`Running: ${test.label}`);
+            ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Running: ${test.label}`);
 
             // For PoC: Simulate test execution
             await this.executeTest(test, run);
@@ -146,17 +147,17 @@ export class WinCCOATestController {
 
             if (passed) {
                 run.passed(test, 500);
-                this.outputChannel.appendLine(`✓ ${test.label} passed`);
+                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `✓ ${test.label} passed`);
             } else {
                 const message = new vscode.TestMessage('Test failed: Example assertion error');
                 message.location = new vscode.Location(test.uri!, new vscode.Range(0, 0, 0, 0));
                 run.failed(test, message, 500);
-                this.outputChannel.appendLine(`✗ ${test.label} failed`);
+                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `✗ ${test.label} failed`);
             }
         } catch (error) {
             const message = new vscode.TestMessage(`Error: ${error}`);
             run.failed(test, message);
-            this.outputChannel.appendLine(`✗ ${test.label} error: ${error}`);
+            ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, `✗ ${test.label} error: ${error}`);
         }
     }
 

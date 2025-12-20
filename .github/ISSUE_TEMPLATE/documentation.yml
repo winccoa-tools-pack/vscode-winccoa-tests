@@ -1,0 +1,85 @@
+name: 📖 Documentation Issue
+description: Report an issue with documentation or suggest improvements
+title: "[Docs]: "
+labels: ["documentation", "needs-triage"]
+projects: []
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve our documentation! 📚
+        
+        Please describe the documentation issue or improvement you'd like to suggest.
+
+  - type: dropdown
+    id: doc-type
+    attributes:
+      label: Documentation Type
+      description: What type of documentation is this about?
+      options:
+        - README
+        - API Documentation
+        - User Guide
+        - Developer Guide
+        - Code Comments
+        - Configuration Examples
+        - Troubleshooting
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      description: What kind of documentation issue is this?
+      options:
+        - Missing documentation
+        - Incorrect information
+        - Outdated information
+        - Unclear explanation
+        - Typo/Grammar
+        - Broken link
+        - Missing example
+        - Improvement suggestion
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Documentation Location
+      description: Where is this documentation located?
+      placeholder: "e.g., README.md, docs/api.md, line 42 of extension.ts"
+
+  - type: textarea
+    id: current-content
+    attributes:
+      label: Current Content (if applicable)
+      description: Quote the current content that needs to be changed
+      placeholder: Copy the existing text here if applicable
+
+  - type: textarea
+    id: suggested-content
+    attributes:
+      label: Suggested Content
+      description: What should the documentation say instead?
+      placeholder: Provide your suggested improvement or new content
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any additional context about this documentation issue
+      placeholder: Why is this change needed? Who would benefit from it?
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

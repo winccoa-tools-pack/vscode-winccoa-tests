@@ -1,0 +1,33 @@
+name: "Git Flow Branch Protection"
+id: 12345
+target: "branch"
+enforcement: "active"
+conditions:
+  ref_name:
+    exclude: []
+    include: 
+      - "refs/heads/main"
+      - "refs/heads/develop"
+rules:
+  - type: "pull_request"
+    parameters:
+      dismiss_stale_reviews_on_push: false
+      require_code_owner_review: false
+      require_last_push_approval: false
+      required_approving_review_count: 1
+      required_review_thread_resolution: false
+  - type: "required_status_checks"
+    parameters:
+      strict_required_status_checks_policy: true
+      required_status_checks:
+        - context: "test (18.x)"
+        - context: "test (20.x)"
+        - context: "package"
+  - type: "non_fast_forward"
+    parameters: {}
+  - type: "required_signatures"
+    parameters: {}
+bypass_actors:
+  - actor_id: 1
+    actor_type: "OrganizationAdmin"
+    bypass_mode: "always"

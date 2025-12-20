@@ -1,0 +1,85 @@
+name: ❓ Question / Support
+description: Ask a question or get support for using the extension
+title: "[Question]: "
+labels: ["question", "needs-triage"]
+projects: []
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about using the WinCC OA VS Code Extension? 🤔
+        
+        Please check our [documentation](../README.md) first, then ask your question below.
+
+  - type: dropdown
+    id: question-type
+    attributes:
+      label: Question Type
+      description: What type of question is this?
+      options:
+        - How to use a feature
+        - Configuration help
+        - Troubleshooting
+        - Best practices
+        - Integration guidance
+        - Performance optimization
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: Please describe your question in detail
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide context about what you're trying to accomplish
+      placeholder: |
+        - What are you trying to achieve?
+        - What have you already tried?
+        - What specific part are you stuck on?
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension Version
+      description: What version of the WinCC OA extension are you using?
+      placeholder: "e.g., 1.0.0"
+
+  - type: dropdown
+    id: winccoa-version
+    attributes:
+      label: WinCC OA Version
+      description: Which WinCC OA version are you using?
+      options:
+        - "3.21"
+        - "3.20"
+        - "3.19"
+        - "3.18"
+        - "Multiple versions"
+        - "Not applicable"
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Additional Information
+      description: Any additional information that might be helpful
+      placeholder: Screenshots, configuration files, error messages, etc.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

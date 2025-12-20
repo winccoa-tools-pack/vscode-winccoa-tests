@@ -1,0 +1,48 @@
+name: "Main Branch Protection"
+target: branch
+enforcement: active
+
+conditions:
+  ref_name:
+    include:
+      - "refs/heads/main"
+      - "refs/heads/master"
+      - "refs/heads/develop"
+
+rules:
+  # Require pull requests
+  - type: pull_request
+    parameters:
+      required_approving_review_count: 1
+      dismiss_stale_reviews_on_push: true
+      require_code_owner_review: false
+      require_last_push_approval: false
+      required_review_thread_resolution: false
+
+  # Require status checks to pass
+  - type: required_status_checks
+    parameters:
+      strict_required_status_checks_policy: true
+      required_status_checks:
+        - context: "test (18.x)"
+        - context: "test (20.x)"
+        - context: "package"
+
+  # Prevent force pushes
+  - type: non_fast_forward
+
+  # Require signed commits (optional - can be removed if not using signed commits)
+  - type: required_signatures
+
+  # Prevent deletion of protected branch
+  - type: deletion
+
+  # Require branches to be up to date before merging
+  - type: required_deployments
+    parameters:
+      required_deployment_environments: []
+
+bypass_actors:
+  - actor_id: 1  # Repository admin bypass
+    actor_type: Repository
+    bypass_mode: always

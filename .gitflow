@@ -1,0 +1,18 @@
+# Git Flow Configuration
+# This file configures git-flow extension defaults
+# Run 'git flow init' to initialize Git Flow in this repository
+
+[gitflow "branch"]
+	master = main
+	develop = develop
+
+[gitflow "prefix"]
+	feature = feature/
+	bugfix = bugfix/
+	release = release/
+	hotfix = hotfix/
+	support = support/
+	versiontag = v
+
+[gitflow "path"]
+	hooks = .git/hooks

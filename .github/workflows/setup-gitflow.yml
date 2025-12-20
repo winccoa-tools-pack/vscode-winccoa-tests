@@ -1,0 +1,153 @@
+name: Setup Git Flow Branch Protection
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply_protection:
+        description: "Apply branch protection rules"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  repository-projects: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  setup-gitflow-protection:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.apply_protection == 'true'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup branch protection for main
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.repos.updateBranchProtection({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: 'main',
+                required_status_checks: {
+                  strict: true,
+                  contexts: ['test (18.x)', 'test (20.x)', 'package']
+                },
+                enforce_admins: false,
+                required_pull_request_reviews: {
+                  required_approving_review_count: 1,
+                  dismiss_stale_reviews: false,
+                  require_code_owner_reviews: false,
+                  require_last_push_approval: false
+                },
+                restrictions: null,
+                allow_force_pushes: false,
+                allow_deletions: false,
+                block_creations: false,
+                required_conversation_resolution: false,
+                required_linear_history: false
+              });
+              console.log('✅ Main branch protection updated successfully');
+            } catch (error) {
+              console.error('❌ Failed to update main branch protection:', error.message);
+              throw error;
+            }
+
+      - name: Setup branch protection for develop
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.repos.updateBranchProtection({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: 'develop',
+                required_status_checks: {
+                  strict: true,
+                  contexts: ['test (18.x)', 'test (20.x)', 'package']
+                },
+                enforce_admins: false,
+                required_pull_request_reviews: {
+                  required_approving_review_count: 1,
+                  dismiss_stale_reviews: false,
+                  require_code_owner_reviews: false,
+                  require_last_push_approval: false
+                },
+                restrictions: null,
+                allow_force_pushes: true,
+                allow_deletions: false,
+                block_creations: false,
+                required_conversation_resolution: false,
+                required_linear_history: false
+              });
+              console.log('✅ Develop branch protection updated successfully');
+            } catch (error) {
+              console.error('❌ Failed to update develop branch protection:', error.message);
+              throw error;
+            }
+
+      - name: Setup Git Flow branch naming rules
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branchPatterns = ['feature/**','release/**','hotfix/**','main','develop'];
+            console.log('📋 Git Flow branch patterns configured:');
+            branchPatterns.forEach(pattern => { console.log(`  - ${pattern}`); });
+            console.log('ℹ️ Manual branch naming enforcement should be implemented through:');
+            console.log('  1. Team conventions and training');
+            console.log('  2. Pull request templates');
+            console.log('  3. Git hooks (if desired)');
+
+  validate-gitflow-setup:
+    runs-on: ubuntu-latest
+    needs: setup-gitflow-protection
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate Git Flow branches exist
+        run: |
+          echo "🔍 Validating Git Flow branch setup..."
+          if git ls-remote --heads origin main | grep -q main; then
+            echo "✅ Main branch exists"
+          else
+            echo "❌ Main branch missing"
+            exit 1
+          fi
+          if git ls-remote --heads origin develop | grep -q develop; then
+            echo "✅ Develop branch exists"
+          else
+            echo "❌ Develop branch missing"
+            exit 1
+          fi
+          echo "🎉 Git Flow branch structure validated successfully!"
+
+      - name: Display Git Flow setup summary
+        run: |
+          echo "📊 Git Flow Setup Summary"
+          echo "========================"
+          echo "\n🌳 Branch Structure:" 
+          echo "  main     - Production ready code"
+          echo "  develop  - Integration branch for development"
+          echo "\n🛡️ Protection Rules Applied:"
+          echo "  ✅ Required pull request reviews (1+ reviewer)"
+          echo "  ✅ Required status checks (CI/CD)"
+          echo "  ✅ Up-to-date branch requirements"
+          echo "  ✅ No force pushes to main"
+          echo "\n📝 Branch Naming Conventions:"
+          echo "  feature/description - New features"
+          echo "  release/version      - Release preparation"
+          echo "  hotfix/version       - Critical fixes"
+          echo "\n📖 Documentation:"
+          echo "  See docs/GITFLOW_WORKFLOW.md for complete guide"
+          echo "\n🚀 Next Steps:"
+          echo "  1. Review Git Flow documentation"
+          echo "  2. Create feature branches using: git checkout -b feature/my-feature develop"
+          echo "  3. Follow pull request process for all merges"
+          echo "  4. Use release branches for version preparation"

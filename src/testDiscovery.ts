@@ -46,11 +46,11 @@ export class TestDiscovery {
         ExtensionOutputChannel.debug(this.LOG_SOURCE, `Searching in workspace folder: ${folderPath}`);
 
         try {
-            // Strategy: Search for scripts/ folders one level deep
-            // Pattern: workspace/*/scripts/*.ctl
-            const scriptsPattern = new vscode.RelativePattern(folder, '*/scripts/**/*.ctl');
+            // Strategy: Search for scripts/ folders at any depth
+            // Pattern: scripts/**/*.ctl (searches from workspace root)
+            const scriptsPattern = new vscode.RelativePattern(folder, 'scripts/**/*.ctl');
             
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Using pattern: */scripts/**/*.ctl`);
+            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Using pattern: scripts/**/*.ctl`);
 
             const ctlFiles = await vscode.workspace.findFiles(scriptsPattern);
 

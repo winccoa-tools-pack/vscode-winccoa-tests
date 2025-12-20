@@ -214,7 +214,7 @@ export class WinCCOATestController {
      */
     private setupFileWatcher(): void {
         // Watch for .ctl files in scripts folders
-        const pattern = '*/scripts/**/*.ctl';
+        const pattern = 'scripts/**/*.ctl';
 
         this.fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
 

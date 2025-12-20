@@ -1,17 +1,92 @@
 {
-  "name": "@winccoa-tools-pack/core-utils",
+  "name": "winccoa-vscode-tests",
+  "displayName": "WinCC OA Test Explorer",
+  "description": "Test Explorer integration for WinCC OA unit tests in Visual Studio Code",
+  "publisher": "RichardJanisch",
   "version": "0.1.0",
   "author": "winccoa-tools-pack",
   "license": "MIT",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "icon": "resources/wincc_oa_tests_512.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/winccoa-tools-pack/vscode-winccoa-tests"
+  },
+  "engines": {
+    "vscode": "^1.106.2"
+  },
+  "categories": [
+    "Testing"
+  ],
+  "keywords": [
+    "wincc",
+    "oa",
+    "test",
+    "unittest",
+    "test-explorer"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/*.ctl",
+    "onLanguage:ctrl"
+  ],
+  "main": "dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "winccoa-tests.refreshTests",
+        "title": "Refresh Tests",
+        "category": "WinCC OA Tests",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "winccoa-tests.runAllTests",
+        "title": "Run All Tests",
+        "category": "WinCC OA Tests",
+        "icon": "$(run-all)"
+      }
+    ],
+    "configuration": {
+      "title": "WinCC OA Test Explorer",
+      "properties": {
+        "winccoaTests.testFilesPattern": {
+          "type": "string",
+          "default": "**/*_test.ctl",
+          "description": "Glob pattern to discover WinCC OA test files"
+        },
+        "winccoaTests.winccoaBinPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to WinCC OA bin directory (e.g., C:\\Siemens\\Automation\\WinCC_OA\\3.19\\bin)"
+        },
+        "winccoaTests.logLevel": {
+          "type": "string",
+          "enum": [
+            "ERROR",
+            "WARN",
+            "INFO",
+            "DEBUG"
+          ],
+          "default": "INFO",
+          "description": "Logging level for extension output"
+        }
+      }
+    }
+  },
   "scripts": {
-    "build": "tsc --build",
-    "test": "npm run build && node test/core-utils.test.js",
-    "prepublishOnly": "npm run build"
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node test/core-utils.test.js",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
   },
   "devDependencies": {
-    "typescript": "^5.2.0"
-  }
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.106.2",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.2.0",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {}
 }

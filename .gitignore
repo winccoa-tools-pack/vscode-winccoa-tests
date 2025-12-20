@@ -3,6 +3,8 @@ node_modules/
 
 # Build output
 dist/
+out/
+bin/
 
 # IDE
 .vscode/
@@ -24,7 +26,11 @@ yarn-error.log*
 
 # Testing
 coverage/
+.vscode-test/
 
 # Temporary files
 *.tmp
 .cache/
+*.bak
+*.vsix
+DevEnv.code-workspace

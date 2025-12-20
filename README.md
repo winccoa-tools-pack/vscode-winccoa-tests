@@ -1,103 +1,275 @@
-# NPM Shared Library Template
+# WinCC OA Test Explorer
 
-Minimal starter template for creating shared npm libraries with Git Flow workflow.
+<div align="center">
 
-## 🚀 Quick Start
+![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![VS Code](https://img.shields.io/badge/VS%20Code-^1.106.2-007ACC.svg)
 
-### Initial Setup
+**Test Explorer integration for WinCC OA unit tests in Visual Studio Code**
 
-1. **Create repository from this template**
+⚠️ *Pre-Release Version - Proof of Concept*
+
+</div>
+
+---
+
+## 🎯 Project Goal
+
+This extension aims to integrate WinCC OA unit tests into the Visual Studio Code Test Explorer, providing a seamless testing experience for WinCC OA CTRL script developers.
+
+### Vision
+- **Discover** WinCC OA test files automatically
+- **Run** tests directly from VS Code Test Explorer
+- **View** test results with detailed output
+- **Debug** failed tests with integrated debugging support
+
+---
+
+## ✨ Features (Planned)
+
+### 🔍 Test Discovery
+- Automatic discovery of WinCC OA test files (`*_test.ctl`)
+- Parse test functions and test suites
+- Support for nested test structures
+
+### 🚀 Test Execution
+- Run individual tests or entire test suites
+- Integration with WinCC OA runtime
+- Real-time test execution feedback
+
+### 📊 Test Results
+- Visual test status indicators (✓ passed, ✗ failed, ⊘ skipped)
+- Detailed error messages and stack traces
+- Test duration tracking
+
+### 🎨 IDE Integration
+- Native VS Code Test Explorer UI
+- CodeLens integration for quick test execution
+- Inline test decorations
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Visual Studio Code ^1.106.2
+- WinCC OA installation (3.17 or higher)
+- WinCC OA project with test files
+
+### Installation
+
+#### From Source (Development)
+1. Clone the repository
    ```bash
-   # Via GitHub CLI
-   gh repo create winccoa-tools-pack/<your-library-name> \
-     --template winccoa-tools-pack/template-npm-shared-library \
-     --public
+   git clone https://github.com/winccoa-tools-pack/vscode-winccoa-tests
+   cd vscode-winccoa-tests
    ```
 
-2. **Clone and initialize Git Flow**
+2. Install dependencies and build
    ```bash
-   git clone https://github.com/winccoa-tools-pack/<your-library-name>
-   cd <your-library-name>
-   
-   # Run the setup script (PowerShell)
-   .\setup-gitflow.ps1
-   
-   # Or manually
-   git flow init -d
-   git push -u origin develop
+   make install
+   make build
    ```
 
-3. **Install dependencies and build**
+3. Package and test locally
    ```bash
-   npm install
-   npm run build
-   npm test
+   make test-local
    ```
 
-## 🌳 Git Flow Workflow
+---
 
-This template uses [Git Flow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) for branch management:
+## ⚙️ Configuration
 
-### Branch Structure
-- **`main`** - Production-ready code (stable releases)
-- **`develop`** - Integration branch (pre-release features)
-- **`feature/*`** - New features
-- **`release/*`** - Release preparation
-- **`hotfix/*`** - Emergency fixes for production
+Configure the extension in your VS Code `settings.json`:
 
-### Common Commands
-
-```bash
-# Start a new feature
-git flow feature start my-feature
-
-# Finish feature (merges to develop)
-git flow feature finish my-feature
-
-# Start a release
-git flow release start 1.0.0
-
-# Finish release (merges to main and develop, creates tag)
-git flow release finish 1.0.0
-
-# Hotfix for production
-git flow hotfix start 1.0.1
-git flow hotfix finish 1.0.1
+```json
+{
+  "winccoaTests.testFilesPattern": "**/*_test.ctl",
+  "winccoaTests.winccoaBinPath": "C:\\Siemens\\Automation\\WinCC_OA\\3.19\\bin",
+  "winccoaTests.logLevel": "INFO"
+}
 ```
 
-### Branch Protection
+### Settings Reference
 
-The `setup-gitflow.ps1` script applies protection rules:
-- **main**: Requires PR reviews, status checks, no force pushes
-- **develop**: Requires PR reviews, status checks, allows force pushes (for rebasing)
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `winccoaTests.testFilesPattern` | `**/*_test.ctl` | Glob pattern to discover test files |
+| `winccoaTests.winccoaBinPath` | - | Path to WinCC OA bin directory |
+| `winccoaTests.logLevel` | `INFO` | Logging level (ERROR, WARN, INFO, DEBUG) |
 
-## 🔐 NPM Publishing Setup
+---
 
-To enable automatic publishing to the NPM registry when creating releases, you need to configure an NPM access token:
+## 📋 Usage
 
-### Why NPM_TOKEN is Required
+### Discovering Tests
 
-The `release.yml` workflow automatically publishes your package to NPM when you merge a release PR to `main`. This requires authentication with the NPM registry.
+1. Open a WinCC OA project workspace in VS Code
+2. The extension will automatically scan for test files matching the pattern
+3. View discovered tests in the Test Explorer sidebar
 
-### How to Get an NPM Access Token
+### Running Tests
 
-1. **Log in to NPM**
-   - Go to [npmjs.com](https://www.npmjs.com/) and sign in (or create an account)
+**Via Test Explorer:**
+- Click the ▶️ icon next to a test or test suite
+- Use "Run All Tests" from the command palette
 
-2. **Generate Access Token**
-   - Navigate to **Access Tokens** in your account settings: https://www.npmjs.com/settings/~/tokens
-   - Click **"Generate New Token"** → Select **"Automation"** type
-   - Copy the generated token (you won't see it again!)
+**Via Command Palette:**
+- `WinCC OA Tests: Run All Tests` - Run all discovered tests
+- `WinCC OA Tests: Refresh Tests` - Refresh test discovery
 
-3. **Add Token to Repository**
-   - Go to your GitHub repository settings
-   - Navigate to **Settings** → **Secrets and variables** → **Actions**
-   - Click **"New repository secret"**
-   - Name: `NPM_TOKEN`
-   - Value: Paste your NPM access token
-   - Click **"Add secret"**
+---
 
-### Token Permissions
+## 🏗️ Project Structure
+
+```
+vscode-winccoa-tests/
+├── src/
+│   ├── extension.ts           # Extension entry point
+│   ├── testController.ts      # Test Explorer controller
+│   ├── testDiscovery.ts       # Test file discovery
+│   ├── testParser.ts          # Parse CTRL test files
+│   └── testRunner.ts          # Execute WinCC OA tests
+├── test/
+│   └── suite/                 # Extension tests
+├── resources/                 # Icons and assets
+├── Makefile                   # Build automation
+├── package.json              # Extension manifest
+└── tsconfig.json             # TypeScript configuration
+```
+
+---
+
+## 🛠️ Development Workflow
+
+### Using Makefile
+
+```bash
+# Install dependencies
+make install
+
+# Build extension
+make build
+
+# Watch mode for development
+make watch
+
+# Run tests
+make test
+
+# Package extension
+make package
+
+# Local testing workflow
+make test-local
+```
+
+### Git Flow Integration
+
+This project uses Git Flow for development:
+
+```bash
+# Start new feature
+git flow feature start test-discovery
+
+# Finish feature
+git flow feature finish test-discovery
+
+# Create release
+git flow release start 0.2.0
+git flow release finish 0.2.0
+```
+
+---
+
+## 🧪 Testing
+
+### Extension Tests
+```bash
+npm test
+```
+
+### Manual Testing
+Use the local test workflow:
+```bash
+make test-local TEST_WORKSPACE=path/to/winccoa/project
+```
+
+---
+
+## 🗺️ Roadmap
+
+### Phase 1: Proof of Concept ✅ (Current)
+- [x] Project setup and structure
+- [x] Basic extension scaffolding
+- [ ] Simple test discovery
+- [ ] Basic test execution
+
+### Phase 2: Core Features
+- [ ] Full Test Explorer integration
+- [ ] Test result parsing
+- [ ] Error reporting and diagnostics
+- [ ] Test file watching and auto-refresh
+
+### Phase 3: Advanced Features
+- [ ] Debugging support
+- [ ] Code coverage
+- [ ] Test parametrization
+- [ ] Performance profiling
+
+### Phase 4: Polish & Release
+- [ ] Documentation and examples
+- [ ] CI/CD integration
+- [ ] Marketplace publication
+
+---
+
+## 📚 Resources
+
+### WinCC OA Testing
+- [WinCC OA Documentation](https://www.winccoa.com/)
+- WinCC OA Unit Test Framework
+
+### VS Code Test API
+- [Testing API](https://code.visualstudio.com/api/extension-guides/testing)
+- [Test Explorer UI](https://github.com/microsoft/vscode/issues/testing)
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 👥 Authors
+
+**winccoa-tools-pack**
+- GitHub: [@winccoa-tools-pack](https://github.com/winccoa-tools-pack)
+
+---
+
+## 🙏 Acknowledgments
+
+- VS Code Testing API team
+- WinCC OA community
+- All contributors and testers
+
+---
+
+<div align="center">
+
+**Made with ❤️ for the WinCC OA community**
+
+</div>
+
 
 - **Automation tokens** are recommended for CI/CD (they don't expire but can be revoked)
 - The token needs **publish** permission for your package scope

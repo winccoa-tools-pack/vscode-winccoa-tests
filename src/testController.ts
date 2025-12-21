@@ -270,11 +270,11 @@ export class WinCCOATestController {
         const run = this.testController.createTestRun(request);
         const queue: vscode.TestItem[] = [];
 
-        // Gather tests to run
+        // Gather tests to run - recursively collect all test items
         if (request.include) {
-            request.include.forEach(test => queue.push(test));
+            request.include.forEach(test => this.collectTestItems(test, queue));
         } else {
-            this.testController.items.forEach(test => queue.push(test));
+            this.testController.items.forEach(test => this.collectTestItems(test, queue));
         }
 
         ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Running ${queue.length} test(s)...`);
@@ -289,11 +289,28 @@ export class WinCCOATestController {
             run.started(test);
             ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Running: ${test.label}`);
 
-            // For PoC: Simulate test execution
             await this.executeTest(test, run);
         }
 
         run.end();
+    }
+
+    /**
+     * Recursively collect all executable test items (test classes with .ctl files)
+     */
+    private collectTestItems(item: vscode.TestItem, queue: vscode.TestItem[]): void {
+        // Check if this item has a .ctl URI (test class)
+        if (item.uri && item.uri.fsPath.endsWith('.ctl')) {
+            queue.push(item);
+            ExtensionOutputChannel.trace(WinCCOATestController.LOG_SOURCE, `Collected test: ${item.label} (${item.uri.fsPath})`);
+            return;
+        }
+
+        // Otherwise, it's a folder/workspace - recurse into children
+        if (item.children.size > 0) {
+            ExtensionOutputChannel.trace(WinCCOATestController.LOG_SOURCE, `Recursing into: ${item.label} (${item.children.size} children)`);
+            item.children.forEach(child => this.collectTestItems(child, queue));
+        }
     }
 
     /**

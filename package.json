@@ -44,6 +44,15 @@
         "icon": "$(run-all)"
       }
     ],
+    "menus": {
+      "testing/view/title": [
+        {
+          "command": "winccoa-tests.refreshTests",
+          "when": "true",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "WinCC OA Test Explorer",
       "properties": {

@@ -14,7 +14,7 @@ import { PathResolver } from './pathResolver';
 export class WinCCOATestController {
     private static readonly LOG_SOURCE = 'TestController';
     private testController: vscode.TestController;
-    private fileWatcher: vscode.FileSystemWatcher | undefined;
+    private fileWatchers: vscode.FileSystemWatcher[] = [];
 
     constructor(
         private context: vscode.ExtensionContext
@@ -566,18 +566,43 @@ export class WinCCOATestController {
      * Setup file watcher for test files
      */
     private setupFileWatcher(): void {
-        // Watch for .ctl files in scripts folders
-        const pattern = 'scripts/**/*.ctl';
+        // Dispose existing watchers
+        this.fileWatchers.forEach(watcher => watcher.dispose());
+        this.fileWatchers = [];
 
-        this.fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+            return;
+        }
 
-        this.fileWatcher.onDidCreate(() => this.discoverTests());
-        this.fileWatcher.onDidChange(() => this.discoverTests());
-        this.fileWatcher.onDidDelete(() => this.discoverTests());
+        // Create a watcher for each workspace folder
+        for (const folder of workspaceFolders) {
+            const pattern = new vscode.RelativePattern(folder, 'scripts/**/*.ctl');
+            const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-        this.context.subscriptions.push(this.fileWatcher);
-        
-        ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `File watcher active for pattern: ${pattern}`);
+            watcher.onDidCreate(() => {
+                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, 'File created, refreshing tests');
+                this.discoverTests();
+            });
+            
+            watcher.onDidChange(() => {
+                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, 'File changed, refreshing tests');
+                this.discoverTests();
+            });
+            
+            watcher.onDidDelete(() => {
+                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, 'File deleted, refreshing tests');
+                this.discoverTests();
+            });
+
+            this.fileWatchers.push(watcher);
+            this.context.subscriptions.push(watcher);
+            
+            ExtensionOutputChannel.debug(
+                WinCCOATestController.LOG_SOURCE, 
+                `File watcher active for: ${folder.name}/scripts/**/*.ctl`
+            );
+        }
     }
 
     /**
@@ -600,8 +625,7 @@ export class WinCCOATestController {
      */
     public dispose(): void {
         this.testController.dispose();
-        if (this.fileWatcher) {
-            this.fileWatcher.dispose();
-        }
+        this.fileWatchers.forEach(watcher => watcher.dispose());
+        this.fileWatchers = [];
     }
 }

@@ -38,6 +38,8 @@ export class TestParser {
     private static readonly GET_ALL_TEST_CASE_IDS_PATTERN = /getAllTestCaseIds\s*\(\s*\)\s*\{([^}]+)\}/s;
     private static readonly MAKE_DYN_STRING_PATTERN = /makeDynString\s*\(([\s\S]*?)\)/;
     private static readonly STRING_LITERAL_PATTERN = /"([^"]+)"/g;
+    // 3.20 format: public int test*() methods
+    private static readonly TEST_METHOD_PATTERN = /public\s+int\s+(test\w*)\s*\(/gm;
 
     /**
      * Parse a CTRL file for test classes and test cases
@@ -89,11 +91,11 @@ export class TestParser {
 
             ExtensionOutputChannel.debug(this.LOG_SOURCE, `Found test class: ${className} at line ${line}`);
 
-            // Extract class body (rough extraction)
-            const classBody = this.extractClassBody(content, classPosition);
+            // Extract class body (rough extraction) - returns { body, startLine }
+            const classBodyInfo = this.extractClassBody(content, classPosition);
 
             // Find test cases in class body
-            const testCases = this.extractTestCases(classBody);
+            const testCases = this.extractTestCases(classBodyInfo.body, classBodyInfo.startLine);
 
             if (testCases.length > 0) {
                 testClasses.push({
@@ -111,13 +113,16 @@ export class TestParser {
     /**
      * Extract class body (simple brace matching)
      */
-    private static extractClassBody(content: string, startPosition: number): string {
+    private static extractClassBody(content: string, startPosition: number): { body: string; startLine: number } {
         let braceCount = 0;
         let startBrace = content.indexOf('{', startPosition);
         
         if (startBrace === -1) {
-            return '';
+            return { body: '', startLine: 0 };
         }
+
+        // Calculate the line number where the class body starts
+        const startLine = content.substring(0, startBrace).split('\n').length;
 
         let endBrace = startBrace;
         for (let i = startBrace; i < content.length; i++) {
@@ -132,19 +137,45 @@ export class TestParser {
             }
         }
 
-        return content.substring(startBrace, endBrace + 1);
+        return {
+            body: content.substring(startBrace, endBrace + 1),
+            startLine
+        };
     }
 
     /**
-     * Extract test cases from getAllTestCaseIds method
+     * Extract test cases from class body
+     * Supports both 3.19 format (getAllTestCaseIds + switch/case) and 3.20 format (public test methods)
      */
-    private static extractTestCases(classBody: string): ParsedTestCase[] {
+    private static extractTestCases(classBody: string, classBodyStartLine: number): ParsedTestCase[] {
+        // Try 3.19 format first (getAllTestCaseIds method)
+        const testCases319 = this.extractTestCases319(classBody, classBodyStartLine);
+        if (testCases319.length > 0) {
+            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Using 3.19 format (getAllTestCaseIds): ${testCases319.length} test(s)`);
+            return testCases319;
+        }
+
+        // Try 3.20 format (public int test*() methods)
+        const testCases320 = this.extractTestCases320(classBody, classBodyStartLine);
+        if (testCases320.length > 0) {
+            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Using 3.20 format (test methods): ${testCases320.length} test(s)`);
+            return testCases320;
+        }
+
+        ExtensionOutputChannel.warn(this.LOG_SOURCE, 'No test cases found in either format');
+        return [];
+    }
+
+    /**
+     * Extract test cases from getAllTestCaseIds method (3.19 format)
+     */
+    private static extractTestCases319(classBody: string, classBodyStartLine: number): ParsedTestCase[] {
         const testCases: ParsedTestCase[] = [];
 
         // Find getAllTestCaseIds method
         const methodMatch = this.GET_ALL_TEST_CASE_IDS_PATTERN.exec(classBody);
         if (!methodMatch) {
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, 'getAllTestCaseIds method not found');
+            ExtensionOutputChannel.trace(this.LOG_SOURCE, 'getAllTestCaseIds method not found (not 3.19 format)');
             return testCases;
         }
 
@@ -164,13 +195,63 @@ export class TestParser {
         this.STRING_LITERAL_PATTERN.lastIndex = 0;
         while ((stringMatch = this.STRING_LITERAL_PATTERN.exec(argumentsString)) !== null) {
             const testCaseId = stringMatch[1];
+            
+            // Find the line number of the corresponding case statement (absolute line in file)
+            const caseLine = this.findCaseLineNumber(classBody, testCaseId, classBodyStartLine);
+            
             testCases.push({
-                id: testCaseId
+                id: testCaseId,
+                line: caseLine
             });
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Found test case: ${testCaseId}`);
+            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Found test case (3.19): ${testCaseId}${caseLine ? ` at line ${caseLine}` : ''}`);
         }
 
         return testCases;
+    }
+
+    /**
+     * Extract test cases from public test methods (3.20 format)
+     */
+    private static extractTestCases320(classBody: string, classBodyStartLine: number): ParsedTestCase[] {
+        const testCases: ParsedTestCase[] = [];
+
+        // Find all public int test*() methods
+        let match;
+        this.TEST_METHOD_PATTERN.lastIndex = 0;
+        while ((match = this.TEST_METHOD_PATTERN.exec(classBody)) !== null) {
+            const methodName = match[1];
+            const matchPosition = match.index;
+
+            // Calculate absolute line number
+            const linesBeforeMatch = classBody.substring(0, matchPosition).split('\n').length;
+            const absoluteLine = classBodyStartLine + linesBeforeMatch - 1;
+
+            testCases.push({
+                id: methodName,
+                line: absoluteLine
+            });
+            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Found test method (3.20): ${methodName} at line ${absoluteLine}`);
+        }
+
+        return testCases;
+    }
+
+    /**
+     * Find the line number of a case statement in the switch
+     */
+    private static findCaseLineNumber(classBody: string, testCaseId: string, classBodyStartLine: number): number | undefined {
+        // Pattern: case "testCaseId":
+        const casePattern = new RegExp(`case\\s+"${testCaseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\s*:`, 'm');
+        const match = casePattern.exec(classBody);
+        
+        if (match) {
+            // Count lines before the match within class body
+            const linesBeforeMatchInBody = classBody.substring(0, match.index).split('\n').length;
+            // Add to class body start line to get absolute line number
+            return classBodyStartLine + linesBeforeMatchInBody - 1;
+        }
+        
+        return undefined;
     }
 
     /**

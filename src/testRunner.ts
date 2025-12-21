@@ -29,9 +29,17 @@ export class TestRunner {
                     this.LOG_SOURCE,
                     'WinCC OA Script Actions extension is not available. Please install it to run tests.'
                 );
+                
                 vscode.window.showWarningMessage(
-                    'WinCC OA Script Actions extension is required to run tests. Please install it from the marketplace.'
-                );
+                    'WinCC OA Script Actions extension is required to run tests.',
+                    'Install Extension',
+                    'Dismiss'
+                ).then(selection => {
+                    if (selection === 'Install Extension') {
+                        vscode.commands.executeCommand('workbench.extensions.search', '@id:RichardJanisch.winccoa-script-actions');
+                    }
+                });
+                
                 return false;
             }
 

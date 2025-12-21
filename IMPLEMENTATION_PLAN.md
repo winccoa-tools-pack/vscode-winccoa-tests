@@ -334,3 +334,33 @@ export function parseTestOutput(output: string): TestResult[] {
 - VS Code Integration: Einfach (API ist straightforward)
 
 Lass uns loslegen! 🚀
+
+
+
+
+Anforderungen an den Parser: 
+
+Wir müssen in der Lages sein zu erkennen welcher Teil in der PVSS_II.log zu unserem aktuellen Test Ablauf gehört. --> ich würde dazu die Zeitstempel nutzen um doppeltes parsing zu vermeiden. 
+
+Ich würde empfehlen zu warten bis das script abgelaufen ist und danach die outputs zu parsen. Vom Ende der File bis zu dem punkt gehen an dem wir alle infos die wir benötigen haben. 
+
+Wir müssen beim parsen darauf achten das wir unnötige inofrmationen ignorieren und nach allen infos die benötiogen suchen. 
+
+Es gibt in der pvss für tests 3 zustände passed, failed, aborted. 
+In einem Test kann es mehrere assert geben. Sprich wir müssen für einen Test auch erkennen und anzeigen wenn zwei stellen fehlgeschalgen hat.
+
+Wir können beim parsen von unten nach oben auch immer nach dieser Msg sucghen: " WCCOActrl    (3), 2025.12.21 16:13:07.493, CTRL, INFO,        6/oaUnit_errors, (INFO) Testcase 'tc_08_ids_and_internal_getters' write message: 
+  Note: Start the test case " Damit wissen wir immer was zu welchem test gehört a weil dort auch überall der name drin steht als auch das alles unter halt dieser msg bs zur nächstem start zu einem test gehört. das sollte hiklfreichsein. 
+
+Wenn etwas aportet ist müssen wir da unbedingt das problem in welches wir da bekommen anzeigen im Resoult ggf auch mit direktem link zum code. 
+
+Ich habe eine File erzeugt welche uns einem guten dummy output erzeugt an dem wir uns orientieren können. 
+
+
+
+
+
+
+
+wir müssen das go to verbessern.
+refresh funktion wenn man tests ändert. 

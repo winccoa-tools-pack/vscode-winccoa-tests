@@ -44,6 +44,15 @@
         "icon": "$(run-all)"
       }
     ],
+    "menus": {
+      "testing/view/title": [
+        {
+          "command": "winccoa-tests.refreshTests",
+          "when": "true",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "WinCC OA Test Explorer",
       "properties": {
@@ -89,20 +98,25 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && npm run copy-fixtures",
+    "copy-fixtures": "mkdir -p dist/test/fixtures && cp -r src/test/fixtures/* dist/test/fixtures/",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node test/core-utils.test.js",
+    "test": "npm run compile && node ./dist/test/runTest.js",
     "lint": "eslint src --ext ts",
     "package": "vsce package"
   },
   "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.106.2",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^2.22.0",
     "eslint": "^8.0.0",
-    "typescript": "^5.2.0",
-    "@vscode/vsce": "^2.22.0"
-  },
-  "dependencies": {}
+    "glob": "^13.0.0",
+    "mocha": "^11.7.5",
+    "typescript": "^5.2.0"
+  }
 }

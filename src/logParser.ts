@@ -20,6 +20,8 @@ export interface TestResult {
     message?: string;
     timestamp?: string;
     stackTrace?: StackTraceLocation;
+    fullStackTrace?: StackTraceLocation[];
+    note?: string;
 }
 
 /**
@@ -75,6 +77,8 @@ export class LogParser {
             let currentTimestamp: string | undefined;
             let currentTestCaseId: string | undefined;
             let collectingStackTrace = false;
+            let collectingNote = false;
+            let currentNote = '';
 
             for await (const line of rl) {
                 // Extract timestamp
@@ -99,7 +103,9 @@ export class LogParser {
                     // Stop collecting stack trace if this test passed
                     if (collectingStackTrace && currentTestCaseId === testCaseId) {
                         collectingStackTrace = false;
+                        collectingNote = false;
                         currentTestCaseId = undefined;
+                        currentNote = '';
                     }
                     continue;
                 }
@@ -118,24 +124,39 @@ export class LogParser {
                             testCaseId,
                             status: 'failed',
                             message,
-                            timestamp: currentTimestamp
+                            timestamp: currentTimestamp,
+                            fullStackTrace: []
                         });
                         ExtensionOutputChannel.debug(this.LOG_SOURCE, `Found FAILED: ${testCaseId} - ${message}`);
                         
                         // Start collecting stack trace for this failed test
                         currentTestCaseId = testCaseId;
                         collectingStackTrace = true;
+                        collectingNote = false;
+                        currentNote = '';
                     }
                     continue;
                 }
 
-                // Check for stack trace (only if we're collecting for a failed test)
-                if (collectingStackTrace && currentTestCaseId) {
-                    // Skip header lines like "Note:" and "StackTrace:"
-                    if (line.includes('Note:') || line.includes('StackTrace:')) {
-                        continue;
+                // Check for Note line
+                if (collectingStackTrace && currentTestCaseId && line.trim().startsWith('Note:')) {
+                    collectingNote = true;
+                    // Extract note text after "Note:"
+                    const noteMatch = /Note:\s*(.+)/.exec(line);
+                    if (noteMatch) {
+                        currentNote = noteMatch[1].trim();
                     }
+                    continue;
+                }
 
+                // Skip StackTrace header line
+                if (collectingStackTrace && currentTestCaseId && line.includes('StackTrace:')) {
+                    collectingNote = false;
+                    continue;
+                }
+
+                // Check for stack trace (only if we're collecting for a failed test)
+                if (collectingStackTrace && currentTestCaseId && !collectingNote) {
                     const stackTraceMatch = this.STACKTRACE_PATTERN.exec(line);
                     if (stackTraceMatch) {
                         const functionName = stackTraceMatch[1].trim();
@@ -147,27 +168,44 @@ export class LogParser {
                             `Found stack trace: ${functionName} at ${filePath}:${lineNumber}`
                         );
 
-                        // Capture the first stack trace entry (topmost in the trace)
-                        // This is where the actual assert failed
                         const result = results.get(currentTestCaseId);
-                        if (result && !result.stackTrace) {
-                            result.stackTrace = {
+                        if (result) {
+                            // Initialize fullStackTrace if not exists
+                            if (!result.fullStackTrace) {
+                                result.fullStackTrace = [];
+                            }
+
+                            // Add to full stack trace
+                            result.fullStackTrace.push({
                                 functionName,
                                 filePath,
                                 line: lineNumber
-                            };
-                            ExtensionOutputChannel.success(
-                                this.LOG_SOURCE,
-                                `Added stack trace for ${currentTestCaseId}: ${filePath}:${lineNumber}`
-                            );
-                            // Stop collecting after first entry - that's the failure location
-                            collectingStackTrace = false;
-                            currentTestCaseId = undefined;
+                            });
+
+                            // Set the first one as the primary stack trace (failure location)
+                            if (!result.stackTrace) {
+                                result.stackTrace = {
+                                    functionName,
+                                    filePath,
+                                    line: lineNumber
+                                };
+                                ExtensionOutputChannel.success(
+                                    this.LOG_SOURCE,
+                                    `Added stack trace for ${currentTestCaseId}: ${filePath}:${lineNumber}`
+                                );
+                            }
+
+                            // Add note if we have one
+                            if (currentNote && !result.note) {
+                                result.note = currentNote;
+                            }
                         }
                     } else if (line.trim() !== '' && !line.startsWith('\t') && !line.startsWith('  ')) {
                         // End of stack trace section (non-indented line)
                         collectingStackTrace = false;
+                        collectingNote = false;
                         currentTestCaseId = undefined;
+                        currentNote = '';
                     }
                 }
             }

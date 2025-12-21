@@ -378,12 +378,34 @@ export class WinCCOATestController {
     }
 
     /**
-     * Create test message with clickable location
+     * Create test message with clickable location and full details
      */
-    private createTestMessage(result: { message?: string; stackTrace?: { filePath: string; line: number; functionName: string } }): vscode.TestMessage {
-        const message = new vscode.TestMessage(result.message || 'Test failed');
+    private createTestMessage(result: { 
+        message?: string; 
+        stackTrace?: { filePath: string; line: number; functionName: string };
+        fullStackTrace?: { filePath: string; line: number; functionName: string }[];
+        note?: string;
+    }): vscode.TestMessage {
+        // Build complete message with all details
+        let fullMessage = result.message || 'Test failed';
         
-        // Add location if we have stack trace information
+        // Add note if available
+        if (result.note) {
+            fullMessage += `\n\nNote: ${result.note}`;
+        }
+        
+        // Add full stack trace
+        if (result.fullStackTrace && result.fullStackTrace.length > 0) {
+            fullMessage += '\n\nStack Trace:';
+            for (const trace of result.fullStackTrace) {
+                fullMessage += `\n  at ${trace.functionName} (${trace.filePath}:${trace.line})`;
+            }
+        }
+        
+        const message = new vscode.TestMessage(fullMessage);
+        
+        // Add primary location if we have stack trace information
+        // This makes the first stack trace entry clickable in the editor
         if (result.stackTrace) {
             const uri = vscode.Uri.file(result.stackTrace.filePath);
             const position = new vscode.Position(result.stackTrace.line - 1, 0);

@@ -4,6 +4,8 @@ import { ExtensionOutputChannel } from './extensionOutput';
 import { TestDiscovery } from './testDiscovery';
 import { ParsedTestFile } from './testParser';
 import { TestRunner } from './testRunner';
+import { LogParser } from './logParser';
+import { PathResolver } from './pathResolver';
 
 /**
  * Main Test Controller for WinCC OA Tests
@@ -198,6 +200,25 @@ export class WinCCOATestController {
                 return;
             }
 
+            // Collect all test case IDs for this test run
+            const testCaseIds: string[] = [];
+            
+            // Check if this is a test class or individual test case
+            if (test.children.size > 0) {
+                // Test class - get all child test cases
+                test.children.forEach(child => {
+                    testCaseIds.push(child.label);
+                });
+            } else {
+                // Individual test case
+                testCaseIds.push(test.label);
+            }
+
+            ExtensionOutputChannel.info(
+                WinCCOATestController.LOG_SOURCE,
+                `Executing ${testCaseIds.length} test case(s): ${testCaseIds.join(', ')}`
+            );
+
             // Execute the test file via Script Actions
             const executionStarted = await TestRunner.executeTestFile(test.uri);
 
@@ -207,17 +228,65 @@ export class WinCCOATestController {
                 return;
             }
 
-            // For now: Mark as passed after execution starts
-            // TODO: Parse log file for actual results
-            ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Test execution started: ${test.label}`);
-            
-            // Wait a bit for execution to complete
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Get log directory path
+            const logDir = await PathResolver.getLogPath();
+            if (!logDir) {
+                ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, 'Could not determine log directory path');
+                const message = new vscode.TestMessage('Could not find log directory');
+                run.failed(test, message);
+                return;
+            }
 
-            // TODO: Parse log file and determine actual test status
-            // For PoC: Mark as passed
-            run.passed(test, 2000);
-            ExtensionOutputChannel.success(WinCCOATestController.LOG_SOURCE, `Test completed: ${test.label}`);
+            // Construct full path to PVSS_II.log
+            const logFilePath = path.join(logDir, 'PVSS_II.log');
+            ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Log file path: ${logFilePath}`);
+
+            // Wait for test results in log file
+            ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Waiting for test results in: ${logFilePath}`);
+            const testResults = await LogParser.waitForTestResults(logFilePath, testCaseIds, 10000, 500);
+
+            // Process results for each test case
+            if (test.children.size > 0) {
+                // Test class - mark each child individually
+                test.children.forEach(child => {
+                    const result = testResults.get(child.label);
+                    
+                    if (result) {
+                        if (result.status === 'passed') {
+                            run.passed(child);
+                            ExtensionOutputChannel.success(WinCCOATestController.LOG_SOURCE, `✓ ${child.label} passed`);
+                        } else {
+                            const message = new vscode.TestMessage(result.message || 'Test failed');
+                            run.failed(child, message);
+                            ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, `✗ ${child.label} failed: ${result.message}`);
+                        }
+                    } else {
+                        // No result found - mark as failed
+                        const message = new vscode.TestMessage('No test result found in log file');
+                        run.failed(child, message);
+                        ExtensionOutputChannel.warn(WinCCOATestController.LOG_SOURCE, `? ${child.label} - no result found`);
+                    }
+                });
+            } else {
+                // Individual test case
+                const result = testResults.get(test.label);
+                
+                if (result) {
+                    if (result.status === 'passed') {
+                        run.passed(test);
+                        ExtensionOutputChannel.success(WinCCOATestController.LOG_SOURCE, `✓ ${test.label} passed`);
+                    } else {
+                        const message = new vscode.TestMessage(result.message || 'Test failed');
+                        run.failed(test, message);
+                        ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, `✗ ${test.label} failed: ${result.message}`);
+                    }
+                } else {
+                    // No result found - mark as failed
+                    const message = new vscode.TestMessage('No test result found in log file');
+                    run.failed(test, message);
+                    ExtensionOutputChannel.warn(WinCCOATestController.LOG_SOURCE, `? ${test.label} - no result found`);
+                }
+            }
 
         } catch (error) {
             const message = new vscode.TestMessage(`Error: ${error}`);

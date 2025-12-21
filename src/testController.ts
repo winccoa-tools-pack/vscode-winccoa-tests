@@ -338,7 +338,7 @@ export class WinCCOATestController {
                             run.passed(child);
                             ExtensionOutputChannel.success(WinCCOATestController.LOG_SOURCE, `✓ ${child.label} passed`);
                         } else {
-                            const message = new vscode.TestMessage(result.message || 'Test failed');
+                            const message = this.createTestMessage(result);
                             run.failed(child, message);
                             ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, `✗ ${child.label} failed: ${result.message}`);
                         }
@@ -358,7 +358,7 @@ export class WinCCOATestController {
                         run.passed(test);
                         ExtensionOutputChannel.success(WinCCOATestController.LOG_SOURCE, `✓ ${test.label} passed`);
                     } else {
-                        const message = new vscode.TestMessage(result.message || 'Test failed');
+                        const message = this.createTestMessage(result);
                         run.failed(test, message);
                         ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, `✗ ${test.label} failed: ${result.message}`);
                     }
@@ -375,6 +375,29 @@ export class WinCCOATestController {
             run.failed(test, message);
             ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, `Test execution error: ${test.label}`, error as Error);
         }
+    }
+
+    /**
+     * Create test message with clickable location
+     */
+    private createTestMessage(result: { message?: string; stackTrace?: { filePath: string; line: number; functionName: string } }): vscode.TestMessage {
+        const message = new vscode.TestMessage(result.message || 'Test failed');
+        
+        // Add location if we have stack trace information
+        if (result.stackTrace) {
+            const uri = vscode.Uri.file(result.stackTrace.filePath);
+            const position = new vscode.Position(result.stackTrace.line - 1, 0);
+            const location = new vscode.Location(uri, position);
+            
+            message.location = location;
+            
+            ExtensionOutputChannel.debug(
+                WinCCOATestController.LOG_SOURCE,
+                `Added clickable location: ${result.stackTrace.filePath}:${result.stackTrace.line}`
+            );
+        }
+        
+        return message;
     }
 
     /**

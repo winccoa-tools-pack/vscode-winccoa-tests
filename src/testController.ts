@@ -1,17 +1,23 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { ExtensionOutputChannel } from './extensionOutput';
+import { TestDiscovery } from './testDiscovery';
+import { ParsedTestFile } from './testParser';
+import { TestRunner } from './testRunner';
+import { LogParser } from './logParser';
+import { PathResolver } from './pathResolver';
 
 /**
  * Main Test Controller for WinCC OA Tests
  * Integrates with VS Code Test Explorer API
  */
 export class WinCCOATestController {
+    private static readonly LOG_SOURCE = 'TestController';
     private testController: vscode.TestController;
     private fileWatcher: vscode.FileSystemWatcher | undefined;
 
     constructor(
-        private context: vscode.ExtensionContext,
-        private outputChannel: vscode.OutputChannel
+        private context: vscode.ExtensionContext
     ) {
         // Create Test Controller
         this.testController = vscode.tests.createTestController(
@@ -40,58 +46,186 @@ export class WinCCOATestController {
      * Discover tests in workspace
      */
     private async discoverTests(): Promise<void> {
-        this.outputChannel.appendLine('Discovering WinCC OA test files...');
-
-        const config = vscode.workspace.getConfiguration('winccoaTests');
-        const pattern = config.get<string>('testFilesPattern', '**/*_test.ctl');
+        ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Discovering WinCC OA test files...');
 
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
-            this.outputChannel.appendLine('No workspace folder found');
+            ExtensionOutputChannel.warn(WinCCOATestController.LOG_SOURCE, 'No workspace folder found');
+            this.showNoWorkspaceMessage();
             return;
         }
 
-        // Find all test files
-        const files = await vscode.workspace.findFiles(pattern);
-        this.outputChannel.appendLine(`Found ${files.length} test file(s)`);
+        // Discover all test files
+        const testFiles = await TestDiscovery.discoverTests();
 
         // Clear existing tests
         this.testController.items.replace([]);
 
-        // Create test items for each file
-        for (const fileUri of files) {
-            await this.createTestItemFromFile(fileUri);
+        if (testFiles.length === 0) {
+            ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'No test files found - showing placeholder');
+            this.showNoTestsFoundMessage();
+            return;
         }
+
+        // Build hierarchical structure
+        this.buildTestHierarchy(testFiles, workspaceFolders[0].uri.fsPath);
     }
 
     /**
-     * Create test item from file
+     * Show message when no workspace is found
      */
-    private async createTestItemFromFile(fileUri: vscode.Uri): Promise<void> {
-        const fileName = path.basename(fileUri.fsPath);
-        const testId = fileUri.toString();
-
-        this.outputChannel.appendLine(`Creating test item for: ${fileName}`);
-
-        // Create a test item for the file
-        const testItem = this.testController.createTestItem(
-            testId,
-            fileName,
-            fileUri
+    private showNoWorkspaceMessage(): void {
+        const placeholderItem = this.testController.createTestItem(
+            'no-workspace',
+            '⚠️ No workspace folder open',
+            undefined
         );
+        placeholderItem.canResolveChildren = false;
+        this.testController.items.replace([placeholderItem]);
+    }
 
-        testItem.canResolveChildren = true;
-
-        // For PoC: Add a dummy test function
-        const dummyTest = this.testController.createTestItem(
-            `${testId}::testExample`,
-            'testExample()',
-            fileUri
+    /**
+     * Show message when no tests are found
+     */
+    private showNoTestsFoundMessage(): void {
+        const placeholderItem = this.testController.createTestItem(
+            'no-tests',
+            'ℹ️ No WinCC OA test files found (looking for "class X : OaTest" in */scripts/**/*.ctl)',
+            undefined
         );
-        dummyTest.range = new vscode.Range(0, 0, 0, 0);
+        placeholderItem.canResolveChildren = false;
+        this.testController.items.replace([placeholderItem]);
+    }
 
-        testItem.children.replace([dummyTest]);
-        this.testController.items.add(testItem);
+    /**
+     * Build hierarchical test structure based on folder structure
+     */
+    private buildTestHierarchy(testFiles: ParsedTestFile[], workspaceRoot: string): void {
+        // Group test files by directory
+        const folderMap = new Map<string, ParsedTestFile[]>();
+
+        for (const testFile of testFiles) {
+            const relativePath = path.relative(workspaceRoot, testFile.fileUri.fsPath);
+            const dirPath = path.dirname(relativePath);
+
+            if (!folderMap.has(dirPath)) {
+                folderMap.set(dirPath, []);
+            }
+            folderMap.get(dirPath)!.push(testFile);
+        }
+
+        // Create folder hierarchy
+        const sortedDirs = Array.from(folderMap.keys()).sort();
+        
+        for (const dirPath of sortedDirs) {
+            const files = folderMap.get(dirPath)!;
+            
+            // Get or create folder item
+            const folderItem = this.getOrCreateFolderItem(dirPath, workspaceRoot);
+            
+            // Add test files to folder
+            for (const testFile of files) {
+                this.createTestItemsFromParsedFile(testFile, folderItem);
+            }
+        }
+
+        ExtensionOutputChannel.success(
+            WinCCOATestController.LOG_SOURCE,
+            `Built test hierarchy with ${folderMap.size} folder(s)`
+        );
+    }
+
+    /**
+     * Get or create folder item for directory path
+     */
+    private getOrCreateFolderItem(dirPath: string, workspaceRoot: string): vscode.TestItem {
+        const parts = dirPath.split(path.sep).filter(p => p.length > 0);
+        let currentParent: vscode.TestItem | undefined = undefined;
+        let currentPath = '';
+
+        // Build folder hierarchy from root
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            currentPath = currentPath ? path.join(currentPath, part) : part;
+            const folderId = `folder::${currentPath}`;
+
+            let folderItem: vscode.TestItem | undefined;
+
+            // Check if folder item already exists
+            if (currentParent) {
+                folderItem = currentParent.children.get(folderId);
+            } else {
+                folderItem = this.testController.items.get(folderId);
+            }
+
+            // Create folder item if it doesn't exist
+            if (!folderItem) {
+                folderItem = this.testController.createTestItem(
+                    folderId,
+                    part,
+                    vscode.Uri.file(path.join(workspaceRoot, currentPath))
+                );
+                folderItem.canResolveChildren = false;
+
+                if (currentParent) {
+                    currentParent.children.add(folderItem);
+                } else {
+                    this.testController.items.add(folderItem);
+                }
+            }
+
+            currentParent = folderItem;
+        }
+
+        return currentParent!;
+    }
+
+    /**
+     * Create test items from parsed file
+     */
+    private createTestItemsFromParsedFile(parsedFile: ParsedTestFile, parentFolder: vscode.TestItem): void {
+        const fileName = path.basename(parsedFile.fileUri.fsPath);
+        
+        ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Creating test items for: ${fileName}`);
+
+        // Create test item for each test class
+        for (const testClass of parsedFile.testClasses) {
+            const classId = `${parsedFile.fileUri.toString()}::${testClass.className}`;
+
+            const classItem = this.testController.createTestItem(
+                classId,
+                `${testClass.className}`,
+                parsedFile.fileUri
+            );
+
+            classItem.canResolveChildren = false;
+            classItem.range = new vscode.Range(testClass.line - 1, 0, testClass.line - 1, 0);
+            classItem.description = fileName;
+
+            // Add test cases as children
+            for (const testCase of testClass.testCases) {
+                const testCaseId = `${classId}::${testCase.id}`;
+                
+                const testCaseItem = this.testController.createTestItem(
+                    testCaseId,
+                    testCase.id,
+                    parsedFile.fileUri
+                );
+
+                if (testCase.line) {
+                    testCaseItem.range = new vscode.Range(testCase.line - 1, 0, testCase.line - 1, 0);
+                }
+
+                classItem.children.add(testCaseItem);
+            }
+
+            parentFolder.children.add(classItem);
+            
+            ExtensionOutputChannel.debug(
+                WinCCOATestController.LOG_SOURCE,
+                `Added ${testClass.testCases.length} test case(s) for class: ${testClass.className}`
+            );
+        }
     }
 
     /**
@@ -111,7 +245,7 @@ export class WinCCOATestController {
             this.testController.items.forEach(test => queue.push(test));
         }
 
-        this.outputChannel.appendLine(`Running ${queue.length} test(s)...`);
+        ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Running ${queue.length} test(s)...`);
 
         // Run each test
         for (const test of queue) {
@@ -121,7 +255,7 @@ export class WinCCOATestController {
             }
 
             run.started(test);
-            this.outputChannel.appendLine(`Running: ${test.label}`);
+            ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Running: ${test.label}`);
 
             // For PoC: Simulate test execution
             await this.executeTest(test, run);
@@ -131,41 +265,169 @@ export class WinCCOATestController {
     }
 
     /**
-     * Execute a single test (PoC implementation)
+     * Execute a single test (real implementation)
      */
     private async executeTest(
         test: vscode.TestItem,
         run: vscode.TestRun
     ): Promise<void> {
         try {
-            // Simulate test execution
-            await new Promise(resolve => setTimeout(resolve, 500));
+            ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Executing test: ${test.label}`);
 
-            // For PoC: Randomly pass or fail
-            const passed = Math.random() > 0.3;
-
-            if (passed) {
-                run.passed(test, 500);
-                this.outputChannel.appendLine(`✓ ${test.label} passed`);
-            } else {
-                const message = new vscode.TestMessage('Test failed: Example assertion error');
-                message.location = new vscode.Location(test.uri!, new vscode.Range(0, 0, 0, 0));
-                run.failed(test, message, 500);
-                this.outputChannel.appendLine(`✗ ${test.label} failed`);
+            // Get the file URI from test item
+            if (!test.uri) {
+                ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, `Test has no URI: ${test.label}`);
+                const message = new vscode.TestMessage('Test file URI not found');
+                run.failed(test, message);
+                return;
             }
+
+            // Collect all test case IDs for this test run
+            const testCaseIds: string[] = [];
+            
+            // Check if this is a test class or individual test case
+            if (test.children.size > 0) {
+                // Test class - get all child test cases
+                test.children.forEach(child => {
+                    testCaseIds.push(child.label);
+                });
+            } else {
+                // Individual test case
+                testCaseIds.push(test.label);
+            }
+
+            ExtensionOutputChannel.info(
+                WinCCOATestController.LOG_SOURCE,
+                `Executing ${testCaseIds.length} test case(s): ${testCaseIds.join(', ')}`
+            );
+
+            // Execute the test file via Script Actions
+            const executionStarted = await TestRunner.executeTestFile(test.uri);
+
+            if (!executionStarted) {
+                const message = new vscode.TestMessage('Failed to start test execution. Is WinCC OA Script Actions extension installed?');
+                run.failed(test, message);
+                return;
+            }
+
+            // Get log directory path
+            const logDir = await PathResolver.getLogPath();
+            if (!logDir) {
+                ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, 'Could not determine log directory path');
+                const message = new vscode.TestMessage('Could not find log directory');
+                run.failed(test, message);
+                return;
+            }
+
+            // Construct full path to PVSS_II.log
+            const logFilePath = path.join(logDir, 'PVSS_II.log');
+            ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Log file path: ${logFilePath}`);
+
+            // Wait for test results in log file
+            ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Waiting for test results in: ${logFilePath}`);
+            const testResults = await LogParser.waitForTestResults(logFilePath, testCaseIds, 10000, 500);
+
+            // Process results for each test case
+            if (test.children.size > 0) {
+                // Test class - mark each child individually
+                test.children.forEach(child => {
+                    const result = testResults.get(child.label);
+                    
+                    if (result) {
+                        if (result.status === 'passed') {
+                            run.passed(child);
+                            ExtensionOutputChannel.success(WinCCOATestController.LOG_SOURCE, `✓ ${child.label} passed`);
+                        } else {
+                            const message = this.createTestMessage(result);
+                            run.failed(child, message);
+                            ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, `✗ ${child.label} failed: ${result.message}`);
+                        }
+                    } else {
+                        // No result found - mark as failed
+                        const message = new vscode.TestMessage('No test result found in log file');
+                        run.failed(child, message);
+                        ExtensionOutputChannel.warn(WinCCOATestController.LOG_SOURCE, `? ${child.label} - no result found`);
+                    }
+                });
+            } else {
+                // Individual test case
+                const result = testResults.get(test.label);
+                
+                if (result) {
+                    if (result.status === 'passed') {
+                        run.passed(test);
+                        ExtensionOutputChannel.success(WinCCOATestController.LOG_SOURCE, `✓ ${test.label} passed`);
+                    } else {
+                        const message = this.createTestMessage(result);
+                        run.failed(test, message);
+                        ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, `✗ ${test.label} failed: ${result.message}`);
+                    }
+                } else {
+                    // No result found - mark as failed
+                    const message = new vscode.TestMessage('No test result found in log file');
+                    run.failed(test, message);
+                    ExtensionOutputChannel.warn(WinCCOATestController.LOG_SOURCE, `? ${test.label} - no result found`);
+                }
+            }
+
         } catch (error) {
             const message = new vscode.TestMessage(`Error: ${error}`);
             run.failed(test, message);
-            this.outputChannel.appendLine(`✗ ${test.label} error: ${error}`);
+            ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, `Test execution error: ${test.label}`, error as Error);
         }
+    }
+
+    /**
+     * Create test message with clickable location and full details
+     */
+    private createTestMessage(result: { 
+        message?: string; 
+        stackTrace?: { filePath: string; line: number; functionName: string };
+        fullStackTrace?: { filePath: string; line: number; functionName: string }[];
+        note?: string;
+    }): vscode.TestMessage {
+        // Build complete message with all details
+        let fullMessage = result.message || 'Test failed';
+        
+        // Add note if available
+        if (result.note) {
+            fullMessage += `\n\nNote: ${result.note}`;
+        }
+        
+        // Add full stack trace
+        if (result.fullStackTrace && result.fullStackTrace.length > 0) {
+            fullMessage += '\n\nStack Trace:';
+            for (const trace of result.fullStackTrace) {
+                fullMessage += `\n  at ${trace.functionName} (${trace.filePath}:${trace.line})`;
+            }
+        }
+        
+        const message = new vscode.TestMessage(fullMessage);
+        
+        // Add primary location if we have stack trace information
+        // This makes the first stack trace entry clickable in the editor
+        if (result.stackTrace) {
+            const uri = vscode.Uri.file(result.stackTrace.filePath);
+            const position = new vscode.Position(result.stackTrace.line - 1, 0);
+            const location = new vscode.Location(uri, position);
+            
+            message.location = location;
+            
+            ExtensionOutputChannel.debug(
+                WinCCOATestController.LOG_SOURCE,
+                `Added clickable location: ${result.stackTrace.filePath}:${result.stackTrace.line}`
+            );
+        }
+        
+        return message;
     }
 
     /**
      * Setup file watcher for test files
      */
     private setupFileWatcher(): void {
-        const config = vscode.workspace.getConfiguration('winccoaTests');
-        const pattern = config.get<string>('testFilesPattern', '**/*_test.ctl');
+        // Watch for .ctl files in scripts folders
+        const pattern = 'scripts/**/*.ctl';
 
         this.fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
 
@@ -174,6 +436,8 @@ export class WinCCOATestController {
         this.fileWatcher.onDidDelete(() => this.discoverTests());
 
         this.context.subscriptions.push(this.fileWatcher);
+        
+        ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `File watcher active for pattern: ${pattern}`);
     }
 
     /**

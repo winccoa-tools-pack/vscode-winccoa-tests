@@ -68,7 +68,7 @@ export class WinCCOATestController {
         }
 
         // Build hierarchical structure
-        this.buildTestHierarchy(testFiles, workspaceFolders[0].uri.fsPath);
+        this.buildTestHierarchy(testFiles);
     }
 
     /**
@@ -100,12 +100,37 @@ export class WinCCOATestController {
     /**
      * Build hierarchical test structure based on folder structure
      */
-    private buildTestHierarchy(testFiles: ParsedTestFile[], workspaceRoot: string): void {
-        // Group test files by directory
-        const folderMap = new Map<string, ParsedTestFile[]>();
+    private buildTestHierarchy(testFiles: ParsedTestFile[]): void {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+            return;
+        }
+
+        // Group test files by workspace folder first, then by directory
+        const workspaceFolderMap = new Map<vscode.WorkspaceFolder, Map<string, ParsedTestFile[]>>();
 
         for (const testFile of testFiles) {
-            const relativePath = path.relative(workspaceRoot, testFile.fileUri.fsPath);
+            // Find which workspace folder this file belongs to
+            const workspaceFolder = workspaceFolders.find(folder => 
+                testFile.fileUri.fsPath.startsWith(folder.uri.fsPath)
+            );
+
+            if (!workspaceFolder) {
+                ExtensionOutputChannel.warn(
+                    WinCCOATestController.LOG_SOURCE,
+                    `Could not find workspace folder for: ${testFile.fileUri.fsPath}`
+                );
+                continue;
+            }
+            
+            // Get or create folder map for this workspace
+            if (!workspaceFolderMap.has(workspaceFolder)) {
+                workspaceFolderMap.set(workspaceFolder, new Map<string, ParsedTestFile[]>());
+            }
+            const folderMap = workspaceFolderMap.get(workspaceFolder)!;
+
+            // Calculate relative path from workspace root
+            const relativePath = path.relative(workspaceFolder.uri.fsPath, testFile.fileUri.fsPath);
             const dirPath = path.dirname(relativePath);
 
             if (!folderMap.has(dirPath)) {
@@ -114,70 +139,77 @@ export class WinCCOATestController {
             folderMap.get(dirPath)!.push(testFile);
         }
 
-        // Create folder hierarchy
-        const sortedDirs = Array.from(folderMap.keys()).sort();
-        
-        for (const dirPath of sortedDirs) {
-            const files = folderMap.get(dirPath)!;
+        // Create folder hierarchy for each workspace folder
+        let totalFolders = 0;
+        for (const [workspaceFolder, folderMap] of workspaceFolderMap) {
+            // Create workspace folder as top-level item
+            const workspaceFolderId = `workspace::${workspaceFolder.name}`;
+            let workspaceFolderItem = this.testController.items.get(workspaceFolderId);
             
-            // Get or create folder item
-            const folderItem = this.getOrCreateFolderItem(dirPath, workspaceRoot);
+            if (!workspaceFolderItem) {
+                workspaceFolderItem = this.testController.createTestItem(
+                    workspaceFolderId,
+                    workspaceFolder.name,
+                    workspaceFolder.uri
+                );
+                workspaceFolderItem.canResolveChildren = false;
+                this.testController.items.add(workspaceFolderItem);
+            }
+
+            const sortedDirs = Array.from(folderMap.keys()).sort();
             
-            // Add test files to folder
-            for (const testFile of files) {
-                this.createTestItemsFromParsedFile(testFile, folderItem);
+            for (const dirPath of sortedDirs) {
+                const files = folderMap.get(dirPath)!;
+                
+                // Get or create folder item (relative to workspace root, under workspace item)
+                const folderItem = this.getOrCreateFolderItem(dirPath, workspaceFolder, workspaceFolderItem);
+                
+                // Add test files to folder
+                for (const testFile of files) {
+                    this.createTestItemsFromParsedFile(testFile, folderItem);
+                }
+                
+                totalFolders++;
             }
         }
 
         ExtensionOutputChannel.success(
             WinCCOATestController.LOG_SOURCE,
-            `Built test hierarchy with ${folderMap.size} folder(s)`
+            `Built test hierarchy with ${totalFolders} folder(s) across ${workspaceFolderMap.size} workspace(s)`
         );
     }
 
     /**
      * Get or create folder item for directory path
      */
-    private getOrCreateFolderItem(dirPath: string, workspaceRoot: string): vscode.TestItem {
+    private getOrCreateFolderItem(dirPath: string, workspaceFolder: vscode.WorkspaceFolder, workspaceItem: vscode.TestItem): vscode.TestItem {
         const parts = dirPath.split(path.sep).filter(p => p.length > 0);
-        let currentParent: vscode.TestItem | undefined = undefined;
+        let currentParent: vscode.TestItem = workspaceItem; // Start under workspace item
         let currentPath = '';
 
         // Build folder hierarchy from root
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
             currentPath = currentPath ? path.join(currentPath, part) : part;
-            const folderId = `folder::${currentPath}`;
+            const folderId = `folder::${workspaceFolder.name}::${currentPath}`;
 
-            let folderItem: vscode.TestItem | undefined;
-
-            // Check if folder item already exists
-            if (currentParent) {
-                folderItem = currentParent.children.get(folderId);
-            } else {
-                folderItem = this.testController.items.get(folderId);
-            }
+            let folderItem = currentParent.children.get(folderId);
 
             // Create folder item if it doesn't exist
             if (!folderItem) {
                 folderItem = this.testController.createTestItem(
                     folderId,
                     part,
-                    vscode.Uri.file(path.join(workspaceRoot, currentPath))
+                    vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, currentPath))
                 );
                 folderItem.canResolveChildren = false;
-
-                if (currentParent) {
-                    currentParent.children.add(folderItem);
-                } else {
-                    this.testController.items.add(folderItem);
-                }
+                currentParent.children.add(folderItem);
             }
 
             currentParent = folderItem;
         }
 
-        return currentParent!;
+        return currentParent;
     }
 
     /**

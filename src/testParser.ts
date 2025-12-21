@@ -38,6 +38,8 @@ export class TestParser {
     private static readonly GET_ALL_TEST_CASE_IDS_PATTERN = /getAllTestCaseIds\s*\(\s*\)\s*\{([^}]+)\}/s;
     private static readonly MAKE_DYN_STRING_PATTERN = /makeDynString\s*\(([\s\S]*?)\)/;
     private static readonly STRING_LITERAL_PATTERN = /"([^"]+)"/g;
+    // 3.20 format: public int test*() methods
+    private static readonly TEST_METHOD_PATTERN = /public\s+int\s+(test\w*)\s*\(/gm;
 
     /**
      * Parse a CTRL file for test classes and test cases
@@ -142,15 +144,38 @@ export class TestParser {
     }
 
     /**
-     * Extract test cases from getAllTestCaseIds method
+     * Extract test cases from class body
+     * Supports both 3.19 format (getAllTestCaseIds + switch/case) and 3.20 format (public test methods)
      */
     private static extractTestCases(classBody: string, classBodyStartLine: number): ParsedTestCase[] {
+        // Try 3.19 format first (getAllTestCaseIds method)
+        const testCases319 = this.extractTestCases319(classBody, classBodyStartLine);
+        if (testCases319.length > 0) {
+            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Using 3.19 format (getAllTestCaseIds): ${testCases319.length} test(s)`);
+            return testCases319;
+        }
+
+        // Try 3.20 format (public int test*() methods)
+        const testCases320 = this.extractTestCases320(classBody, classBodyStartLine);
+        if (testCases320.length > 0) {
+            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Using 3.20 format (test methods): ${testCases320.length} test(s)`);
+            return testCases320;
+        }
+
+        ExtensionOutputChannel.warn(this.LOG_SOURCE, 'No test cases found in either format');
+        return [];
+    }
+
+    /**
+     * Extract test cases from getAllTestCaseIds method (3.19 format)
+     */
+    private static extractTestCases319(classBody: string, classBodyStartLine: number): ParsedTestCase[] {
         const testCases: ParsedTestCase[] = [];
 
         // Find getAllTestCaseIds method
         const methodMatch = this.GET_ALL_TEST_CASE_IDS_PATTERN.exec(classBody);
         if (!methodMatch) {
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, 'getAllTestCaseIds method not found');
+            ExtensionOutputChannel.trace(this.LOG_SOURCE, 'getAllTestCaseIds method not found (not 3.19 format)');
             return testCases;
         }
 
@@ -178,7 +203,34 @@ export class TestParser {
                 id: testCaseId,
                 line: caseLine
             });
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Found test case: ${testCaseId}${caseLine ? ` at line ${caseLine}` : ''}`);
+            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Found test case (3.19): ${testCaseId}${caseLine ? ` at line ${caseLine}` : ''}`);
+        }
+
+        return testCases;
+    }
+
+    /**
+     * Extract test cases from public test methods (3.20 format)
+     */
+    private static extractTestCases320(classBody: string, classBodyStartLine: number): ParsedTestCase[] {
+        const testCases: ParsedTestCase[] = [];
+
+        // Find all public int test*() methods
+        let match;
+        this.TEST_METHOD_PATTERN.lastIndex = 0;
+        while ((match = this.TEST_METHOD_PATTERN.exec(classBody)) !== null) {
+            const methodName = match[1];
+            const matchPosition = match.index;
+
+            // Calculate absolute line number
+            const linesBeforeMatch = classBody.substring(0, matchPosition).split('\n').length;
+            const absoluteLine = classBodyStartLine + linesBeforeMatch - 1;
+
+            testCases.push({
+                id: methodName,
+                line: absoluteLine
+            });
+            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Found test method (3.20): ${methodName} at line ${absoluteLine}`);
         }
 
         return testCases;

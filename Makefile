@@ -4,6 +4,7 @@
 EXTENSION_NAME := winccoa-vscode-tests
 VERSION := $(shell node -p "require('./package.json').version")
 BIN_DIR := bin
+DIST_DIR := dist
 EXT_PUBLISHER := RichardJanisch
 EXT_NAME := winccoa-vscode-tests
 EXT_ID := $(EXT_PUBLISHER).$(EXT_NAME)
@@ -69,9 +70,9 @@ build:
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	rm -rf dist/
+	rm -rf $(DIST_DIR)/
 	rm -rf out/
-	rm -rf bin/
+	rm -rf $(BIN_DIR)/
 	rm -rf node_modules/
 	@echo "Clean completed!"
 

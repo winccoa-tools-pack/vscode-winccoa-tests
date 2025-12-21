@@ -6,7 +6,7 @@
   "version": "0.1.0",
   "author": "winccoa-tools-pack",
   "license": "MIT",
-  "icon": "resources/wincc_oa_tests_512.png",
+  "icon": "resources/wincc_oa_tests_icon_512.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/winccoa-tools-pack/vscode-winccoa-tests"
@@ -99,7 +99,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./ && npm run copy-fixtures",
-    "copy-fixtures": "mkdir -p dist/test/fixtures && cp -r src/test/fixtures/* dist/test/fixtures/",
+    "copy-fixtures": "copyfiles -u 1 \"src/test/fixtures/**/*\" dist/test/fixtures",
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node ./dist/test/runTest.js",
     "lint": "eslint src --ext ts",
@@ -114,6 +114,7 @@
     "@typescript-eslint/parser": "^6.0.0",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^2.22.0",
+    "copyfiles": "^2.4.1",
     "eslint": "^8.0.0",
     "glob": "^13.0.0",
     "mocha": "^11.7.5",

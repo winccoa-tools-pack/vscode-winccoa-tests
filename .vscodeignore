@@ -2,8 +2,13 @@
 node_modules/
 .vscode-test/
 out/
-dist/
 bin/
 *.bak
 *.log
 .DS_Store
+.gitignore
+.gitattributes
+tsconfig.json
+Makefile
+src/
+test-samples/

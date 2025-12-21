@@ -177,6 +177,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
+## ⚠️ Disclaimer
+
+**WinCC OA** and **Siemens** are trademarks of Siemens AG. This project is not affiliated with, endorsed by, or sponsored by Siemens AG. This is a community-driven open source project created to enhance the development experience for WinCC OA developers.
+
+---
+
 <div align="center">
 
 **Made with ❤️ for the WinCC OA community**

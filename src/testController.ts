@@ -465,6 +465,20 @@ export class WinCCOATestController {
 
         if (result.status === 'passed') {
             run.passed(testItem, durationMs);
+            
+            // Add a clickable message that points to the test case definition
+            if (testItem.uri && testItem.range) {
+                const location = new vscode.Location(testItem.uri, testItem.range.start);
+                const message = new vscode.TestMessage('✓ Test passed - click to view test definition');
+                message.location = location;
+                run.appendOutput(`\r\n✓ ${testItem.label} passed\r\n`, location, testItem);
+                
+                ExtensionOutputChannel.debug(
+                    WinCCOATestController.LOG_SOURCE,
+                    `Set passed test location to ${testItem.uri.fsPath}:${testItem.range.start.line + 1}`
+                );
+            }
+            
             ExtensionOutputChannel.success(
                 WinCCOATestController.LOG_SOURCE,
                 `✓ ${testItem.label} passed (${durationMs}ms)`

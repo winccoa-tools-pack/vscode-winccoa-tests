@@ -67,10 +67,8 @@ export class WinCCOATestController {
             return;
         }
 
-        // Create test items for each file
-        for (const testFile of testFiles) {
-            this.createTestItemsFromParsedFile(testFile);
-        }
+        // Build hierarchical structure
+        this.buildTestHierarchy(testFiles, workspaceFolders[0].uri.fsPath);
     }
 
     /**
@@ -100,9 +98,92 @@ export class WinCCOATestController {
     }
 
     /**
+     * Build hierarchical test structure based on folder structure
+     */
+    private buildTestHierarchy(testFiles: ParsedTestFile[], workspaceRoot: string): void {
+        // Group test files by directory
+        const folderMap = new Map<string, ParsedTestFile[]>();
+
+        for (const testFile of testFiles) {
+            const relativePath = path.relative(workspaceRoot, testFile.fileUri.fsPath);
+            const dirPath = path.dirname(relativePath);
+
+            if (!folderMap.has(dirPath)) {
+                folderMap.set(dirPath, []);
+            }
+            folderMap.get(dirPath)!.push(testFile);
+        }
+
+        // Create folder hierarchy
+        const sortedDirs = Array.from(folderMap.keys()).sort();
+        
+        for (const dirPath of sortedDirs) {
+            const files = folderMap.get(dirPath)!;
+            
+            // Get or create folder item
+            const folderItem = this.getOrCreateFolderItem(dirPath, workspaceRoot);
+            
+            // Add test files to folder
+            for (const testFile of files) {
+                this.createTestItemsFromParsedFile(testFile, folderItem);
+            }
+        }
+
+        ExtensionOutputChannel.success(
+            WinCCOATestController.LOG_SOURCE,
+            `Built test hierarchy with ${folderMap.size} folder(s)`
+        );
+    }
+
+    /**
+     * Get or create folder item for directory path
+     */
+    private getOrCreateFolderItem(dirPath: string, workspaceRoot: string): vscode.TestItem {
+        const parts = dirPath.split(path.sep).filter(p => p.length > 0);
+        let currentParent: vscode.TestItem | undefined = undefined;
+        let currentPath = '';
+
+        // Build folder hierarchy from root
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            currentPath = currentPath ? path.join(currentPath, part) : part;
+            const folderId = `folder::${currentPath}`;
+
+            let folderItem: vscode.TestItem | undefined;
+
+            // Check if folder item already exists
+            if (currentParent) {
+                folderItem = currentParent.children.get(folderId);
+            } else {
+                folderItem = this.testController.items.get(folderId);
+            }
+
+            // Create folder item if it doesn't exist
+            if (!folderItem) {
+                folderItem = this.testController.createTestItem(
+                    folderId,
+                    part,
+                    vscode.Uri.file(path.join(workspaceRoot, currentPath))
+                );
+                folderItem.canResolveChildren = false;
+
+                if (currentParent) {
+                    currentParent.children.add(folderItem);
+                } else {
+                    this.testController.items.add(folderItem);
+                }
+            }
+
+            currentParent = folderItem;
+        }
+
+        return currentParent!;
+    }
+
+    /**
      * Create test items from parsed file
      */
-    private createTestItemsFromParsedFile(parsedFile: ParsedTestFile): void {
+    private createTestItemsFromParsedFile(parsedFile: ParsedTestFile, parentFolder: vscode.TestItem): void {
         const fileName = path.basename(parsedFile.fileUri.fsPath);
         
         ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Creating test items for: ${fileName}`);
@@ -113,12 +194,13 @@ export class WinCCOATestController {
 
             const classItem = this.testController.createTestItem(
                 classId,
-                `${fileName} - ${testClass.className}`,
+                `${testClass.className}`,
                 parsedFile.fileUri
             );
 
             classItem.canResolveChildren = false;
             classItem.range = new vscode.Range(testClass.line - 1, 0, testClass.line - 1, 0);
+            classItem.description = fileName;
 
             // Add test cases as children
             for (const testCase of testClass.testCases) {
@@ -137,7 +219,7 @@ export class WinCCOATestController {
                 classItem.children.add(testCaseItem);
             }
 
-            this.testController.items.add(classItem);
+            parentFolder.children.add(classItem);
             
             ExtensionOutputChannel.debug(
                 WinCCOATestController.LOG_SOURCE,

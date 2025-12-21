@@ -15,6 +15,10 @@ export class WinCCOATestController {
     private static readonly LOG_SOURCE = 'TestController';
     private testController: vscode.TestController;
     private fileWatchers: vscode.FileSystemWatcher[] = [];
+    
+    // Test execution queue to prevent parallel runs interfering with shared JSON files
+    private testQueue: Promise<void> = Promise.resolve();
+    private isTestRunning: boolean = false;
 
     constructor(
         private context: vscode.ExtensionContext
@@ -279,20 +283,46 @@ export class WinCCOATestController {
 
         ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Running ${queue.length} test(s)...`);
 
-        // Run each test
-        for (const test of queue) {
-            if (token.isCancellationRequested) {
-                run.skipped(test);
-                continue;
+        // Queue the test execution to prevent parallel runs
+        this.testQueue = this.testQueue.then(async () => {
+            // Check if another test is already running
+            if (this.isTestRunning) {
+                ExtensionOutputChannel.warn(
+                    WinCCOATestController.LOG_SOURCE,
+                    'Another test is already running. Waiting for it to complete...'
+                );
             }
 
-            run.started(test);
-            ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Running: ${test.label}`);
+            // Wait for any running test to complete
+            while (this.isTestRunning) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
 
-            await this.executeTest(test, run);
-        }
+            try {
+                this.isTestRunning = true;
+                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, 'Acquired test execution lock');
 
-        run.end();
+                // Run each test
+                for (const test of queue) {
+                    if (token.isCancellationRequested) {
+                        run.skipped(test);
+                        continue;
+                    }
+
+                    run.started(test);
+                    ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Running: ${test.label}`);
+
+                    await this.executeTest(test, run);
+                }
+            } finally {
+                this.isTestRunning = false;
+                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, 'Released test execution lock');
+                run.end();
+            }
+        });
+
+        // Wait for the queued execution to complete
+        await this.testQueue;
     }
 
     /**

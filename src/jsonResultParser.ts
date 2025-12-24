@@ -221,7 +221,10 @@ export class JsonResultParser {
         const status = this.mapResultToStatus(entry.Result);
         const message = this.buildAssertionMessage(entry);
         const stackTrace = this.parseStackTrace(entry.StackTrace, entry.Location);
-        const location = this.parseLocation(entry);
+        
+        // For Abort: don't use stack trace location (it points to startAll())
+        // Location will be set from test definition in testController
+        const location = entry.Result === 'Aborted' ? undefined : this.parseLocation(entry);
 
         return {
             status,

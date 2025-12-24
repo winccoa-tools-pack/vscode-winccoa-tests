@@ -313,6 +313,110 @@ export class WinCCOATestController {
     }
 
     /**
+     * Get the main project root directory where JSON results will be written.
+     * Tests can be in subprojects, but WinCC OA always writes results to the main project.
+     * 
+     * Strategy:
+     * 1. In automatic mode: Get main project from Core extension
+     * 2. In workspace mode: Search upwards for config/config file
+     */
+    private async getMainProjectRoot(testFileUri?: vscode.Uri): Promise<string | undefined> {
+        const config = vscode.workspace.getConfiguration('winccoaTests');
+        const discoveryMode = config.get<string>('testDiscoveryMode', 'automatic');
+
+        if (discoveryMode === 'automatic') {
+            // Get main project from Core extension
+            const coreExtension = vscode.extensions.getExtension('winccoa-tools-pack.winccoa-core');
+            
+            if (coreExtension) {
+                if (!coreExtension.isActive) {
+                    await coreExtension.activate();
+                }
+                
+                const coreApi = coreExtension.exports;
+                if (coreApi && coreApi.getCurrentProject) {
+                    const currentProject = coreApi.getCurrentProject();
+                    if (currentProject && currentProject.projectDir) {
+                        ExtensionOutputChannel.debug(
+                            WinCCOATestController.LOG_SOURCE,
+                            `Using main project from Core extension: ${currentProject.projectDir}`
+                        );
+                        return currentProject.projectDir;
+                    }
+                }
+            }
+            
+            ExtensionOutputChannel.warn(
+                WinCCOATestController.LOG_SOURCE,
+                'Automatic mode: Core extension not available, falling back to config search'
+            );
+        }
+
+        // Workspace mode or fallback: Search for config/config file
+        if (testFileUri) {
+            const mainProject = await this.findMainProjectFromTestFile(testFileUri);
+            if (mainProject) {
+                return mainProject;
+            }
+        }
+
+        // Last resort: Search all workspace folders for config/config
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders) {
+            for (const folder of workspaceFolders) {
+                const configPath = path.join(folder.uri.fsPath, 'config', 'config');
+                try {
+                    await vscode.workspace.fs.stat(vscode.Uri.file(configPath));
+                    ExtensionOutputChannel.debug(
+                        WinCCOATestController.LOG_SOURCE,
+                        `Found main project with config: ${folder.uri.fsPath}`
+                    );
+                    return folder.uri.fsPath;
+                } catch {
+                    // Not found, continue
+                }
+            }
+        }
+
+        ExtensionOutputChannel.error(
+            WinCCOATestController.LOG_SOURCE,
+            'Could not find main project (no config/config file found)'
+        );
+        return undefined;
+    }
+
+    /**
+     * Find main project by searching upwards from test file for config/config
+     */
+    private async findMainProjectFromTestFile(testFileUri: vscode.Uri): Promise<string | undefined> {
+        let currentDir = path.dirname(testFileUri.fsPath);
+        const maxLevels = 10; // Prevent infinite loop
+        
+        for (let i = 0; i < maxLevels; i++) {
+            const configPath = path.join(currentDir, 'config', 'config');
+            
+            try {
+                await vscode.workspace.fs.stat(vscode.Uri.file(configPath));
+                ExtensionOutputChannel.debug(
+                    WinCCOATestController.LOG_SOURCE,
+                    `Found config/config at: ${currentDir}`
+                );
+                return currentDir;
+            } catch {
+                // Not found, go up one level
+                const parentDir = path.dirname(currentDir);
+                if (parentDir === currentDir) {
+                    // Reached filesystem root
+                    break;
+                }
+                currentDir = parentDir;
+            }
+        }
+        
+        return undefined;
+    }
+
+    /**
      * Run tests
      */
     private async runTests(
@@ -428,43 +532,33 @@ export class WinCCOATestController {
                 `Executing ${testCaseIds.length} test case(s): ${testCaseIds.join(', ')}`
             );
 
-            // Get project root directory from test file URI
-            const testFileUri = test.uri;
-            if (!testFileUri) {
-                ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, 'Test file URI not available');
-                const message = new vscode.TestMessage('Could not determine test file location');
+            // Get the main project root where JSON results will be written
+            // Tests can be in subprojects, but WinCC OA always writes results to main project
+            const mainProjectRoot = await this.getMainProjectRoot(test.uri);
+            if (!mainProjectRoot) {
+                ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, 'Could not determine main project root');
+                const message = new vscode.TestMessage('Could not find main project (no config/config file found)');
                 run.failed(test, message);
                 return;
             }
-
-            // Project root is typically 2 levels up from scripts folder
-            // e.g., /project/scripts/tests/file.ctl -> /project
-            const testFilePath = testFileUri.fsPath;
-            const scriptsIndex = testFilePath.indexOf(path.sep + 'scripts' + path.sep);
-            if (scriptsIndex === -1) {
-                ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, 'Could not determine project root from test file path');
-                const message = new vscode.TestMessage('Invalid test file location');
-                run.failed(test, message);
-                return;
-            }
-            const projectRoot = testFilePath.substring(0, scriptsIndex);
-            ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Project root: ${projectRoot}`);
+            
+            ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Main project root: ${mainProjectRoot}`);
 
             // Step 1: Delete old result files if they exist
-            if (JsonResultParser.resultFilesExist(projectRoot)) {
+            if (JsonResultParser.resultFilesExist(mainProjectRoot)) {
                 ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Deleting old result files...');
-                JsonResultParser.deleteResultFiles(projectRoot);
+                JsonResultParser.deleteResultFiles(mainProjectRoot);
             }
 
             // Step 2: Create empty result files
             ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Creating result files...');
-            JsonResultParser.createResultFiles(projectRoot);
+            JsonResultParser.createResultFiles(mainProjectRoot);
 
             // Step 3: Execute the test file via Script Actions
             const executionStarted = await TestRunner.executeTestFile(test.uri);
 
             if (!executionStarted) {
-                JsonResultParser.deleteResultFiles(projectRoot);
+                JsonResultParser.deleteResultFiles(mainProjectRoot);
                 const message = new vscode.TestMessage('Failed to start test execution. Is WinCC OA Script Actions extension installed?');
                 run.failed(test, message);
                 return;
@@ -472,15 +566,40 @@ export class WinCCOATestController {
 
             // Step 4: Wait a bit for test execution to complete and write results
             ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Waiting for test execution to complete...');
-            await this.waitForTestCompletion(projectRoot, 10000);
+            const resultsAvailable = await this.waitForTestCompletion(mainProjectRoot, 10000);
+            
+            if (!resultsAvailable) {
+                // Timeout or no results - test execution likely failed
+                ExtensionOutputChannel.error(
+                    WinCCOATestController.LOG_SOURCE, 
+                    'Test execution timeout or failed - no results written to JSON files. Check WinCC OA Script Actions output for errors.'
+                );
+                
+                JsonResultParser.deleteResultFiles(mainProjectRoot);
+                
+                const message = new vscode.TestMessage(
+                    'Test execution failed or timed out. No results were written. ' +
+                    'Check the WinCC OA Script Actions output channel for execution errors (syntax errors, missing functions, etc.).'
+                );
+                
+                if (test.children.size > 0) {
+                    test.children.forEach(child => {
+                        run.errored(child, message);
+                    });
+                } else {
+                    run.errored(test, message);
+                }
+                
+                return;
+            }
 
             // Step 5: Parse JSON results
             ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Parsing test results...');
-            const testResults = await JsonResultParser.parseResults(projectRoot, testCaseIds);
+            const testResults = await JsonResultParser.parseResults(mainProjectRoot, testCaseIds);
 
             // Step 6: Delete result files
             ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Cleaning up result files...');
-            JsonResultParser.deleteResultFiles(projectRoot);
+            JsonResultParser.deleteResultFiles(mainProjectRoot);
 
             // Process results for each test case
             if (test.children.size > 0) {
@@ -520,8 +639,9 @@ export class WinCCOATestController {
 
     /**
      * Wait for test completion by polling the result files
+     * @returns true if results were written, false if timeout
      */
-    private async waitForTestCompletion(projectRoot: string, timeoutMs: number): Promise<void> {
+    private async waitForTestCompletion(projectRoot: string, timeoutMs: number): Promise<boolean> {
         const startTime = Date.now();
         const pollInterval = 500; // Check every 500ms
 
@@ -541,7 +661,7 @@ export class WinCCOATestController {
                             WinCCOATestController.LOG_SOURCE,
                             `Test results ready after ${Date.now() - startTime}ms`
                         );
-                        return;
+                        return true;
                     }
                 }
             } catch (error) {
@@ -554,8 +674,9 @@ export class WinCCOATestController {
 
         ExtensionOutputChannel.warn(
             WinCCOATestController.LOG_SOURCE,
-            `Timeout waiting for test results after ${timeoutMs}ms`
+            `Timeout waiting for test results after ${timeoutMs}ms - test execution likely failed`
         );
+        return false;
     }
 
     /**
@@ -590,7 +711,7 @@ export class WinCCOATestController {
             );
         } else if (result.status === 'failed') {
             // Create individual messages for each failed/aborted assertion
-            const messages = this.createJsonTestMessages(result);
+            const messages = this.createJsonTestMessages(testItem, result);
             
             // Add all messages to the test result
             for (const message of messages) {
@@ -603,7 +724,7 @@ export class WinCCOATestController {
             );
         } else if (result.status === 'aborted') {
             // Create individual messages for each failed/aborted assertion
-            const messages = this.createJsonTestMessages(result);
+            const messages = this.createJsonTestMessages(testItem, result);
             
             // Add all messages to the test result
             for (const message of messages) {
@@ -620,15 +741,19 @@ export class WinCCOATestController {
     /**
      * Create individual test messages for each failed/aborted assertion
      */
-    private createJsonTestMessages(result: {
-        message: string;
-        assertions: Array<{
-            status: string;
+    private createJsonTestMessages(
+        testItem: vscode.TestItem,
+        result: {
             message: string;
-            stackTrace?: vscode.TestMessage[];
-            location?: vscode.Location;
-        }>;
-    }): vscode.TestMessage[] {
+            status: string;
+            assertions: Array<{
+                status: string;
+                message: string;
+                stackTrace?: vscode.TestMessage[];
+                location?: vscode.Location;
+            }>;
+        }
+    ): vscode.TestMessage[] {
         const messages: vscode.TestMessage[] = [];
 
         // Create a message for each failed or aborted assertion
@@ -642,6 +767,14 @@ export class WinCCOATestController {
                     ExtensionOutputChannel.debug(
                         WinCCOATestController.LOG_SOURCE,
                         `Created ${assertion.status} message at ${assertion.location.uri.fsPath}:${assertion.location.range.start.line + 1}: ${assertion.message.substring(0, 50)}...`
+                    );
+                } else if (assertion.status === 'aborted' && testItem.uri && testItem.range) {
+                    // For aborted tests without location, use test definition location
+                    message.location = new vscode.Location(testItem.uri, testItem.range.start);
+                    
+                    ExtensionOutputChannel.debug(
+                        WinCCOATestController.LOG_SOURCE,
+                        `Aborted message: using test definition at ${testItem.uri.fsPath}:${testItem.range.start.line + 1}`
                     );
                 }
                 
@@ -659,6 +792,11 @@ export class WinCCOATestController {
                     message.location = assertion.location;
                     break;
                 }
+            }
+            
+            // If still no location and it's aborted, use test definition
+            if (!message.location && result.status === 'aborted' && testItem.uri && testItem.range) {
+                message.location = new vscode.Location(testItem.uri, testItem.range.start);
             }
             
             messages.push(message);

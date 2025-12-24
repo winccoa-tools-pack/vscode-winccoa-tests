@@ -566,7 +566,32 @@ export class WinCCOATestController {
 
             // Step 4: Wait a bit for test execution to complete and write results
             ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Waiting for test execution to complete...');
-            await this.waitForTestCompletion(mainProjectRoot, 10000);
+            const resultsAvailable = await this.waitForTestCompletion(mainProjectRoot, 10000);
+            
+            if (!resultsAvailable) {
+                // Timeout or no results - test execution likely failed
+                ExtensionOutputChannel.error(
+                    WinCCOATestController.LOG_SOURCE, 
+                    'Test execution timeout or failed - no results written to JSON files. Check WinCC OA Script Actions output for errors.'
+                );
+                
+                JsonResultParser.deleteResultFiles(mainProjectRoot);
+                
+                const message = new vscode.TestMessage(
+                    'Test execution failed or timed out. No results were written. ' +
+                    'Check the WinCC OA Script Actions output channel for execution errors (syntax errors, missing functions, etc.).'
+                );
+                
+                if (test.children.size > 0) {
+                    test.children.forEach(child => {
+                        run.errored(child, message);
+                    });
+                } else {
+                    run.errored(test, message);
+                }
+                
+                return;
+            }
 
             // Step 5: Parse JSON results
             ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Parsing test results...');
@@ -614,8 +639,9 @@ export class WinCCOATestController {
 
     /**
      * Wait for test completion by polling the result files
+     * @returns true if results were written, false if timeout
      */
-    private async waitForTestCompletion(projectRoot: string, timeoutMs: number): Promise<void> {
+    private async waitForTestCompletion(projectRoot: string, timeoutMs: number): Promise<boolean> {
         const startTime = Date.now();
         const pollInterval = 500; // Check every 500ms
 
@@ -635,7 +661,7 @@ export class WinCCOATestController {
                             WinCCOATestController.LOG_SOURCE,
                             `Test results ready after ${Date.now() - startTime}ms`
                         );
-                        return;
+                        return true;
                     }
                 }
             } catch (error) {
@@ -648,8 +674,9 @@ export class WinCCOATestController {
 
         ExtensionOutputChannel.warn(
             WinCCOATestController.LOG_SOURCE,
-            `Timeout waiting for test results after ${timeoutMs}ms`
+            `Timeout waiting for test results after ${timeoutMs}ms - test execution likely failed`
         );
+        return false;
     }
 
     /**
@@ -684,7 +711,7 @@ export class WinCCOATestController {
             );
         } else if (result.status === 'failed') {
             // Create individual messages for each failed/aborted assertion
-            const messages = this.createJsonTestMessages(result);
+            const messages = this.createJsonTestMessages(testItem, result);
             
             // Add all messages to the test result
             for (const message of messages) {
@@ -697,7 +724,7 @@ export class WinCCOATestController {
             );
         } else if (result.status === 'aborted') {
             // Create individual messages for each failed/aborted assertion
-            const messages = this.createJsonTestMessages(result);
+            const messages = this.createJsonTestMessages(testItem, result);
             
             // Add all messages to the test result
             for (const message of messages) {
@@ -714,15 +741,19 @@ export class WinCCOATestController {
     /**
      * Create individual test messages for each failed/aborted assertion
      */
-    private createJsonTestMessages(result: {
-        message: string;
-        assertions: Array<{
-            status: string;
+    private createJsonTestMessages(
+        testItem: vscode.TestItem,
+        result: {
             message: string;
-            stackTrace?: vscode.TestMessage[];
-            location?: vscode.Location;
-        }>;
-    }): vscode.TestMessage[] {
+            status: string;
+            assertions: Array<{
+                status: string;
+                message: string;
+                stackTrace?: vscode.TestMessage[];
+                location?: vscode.Location;
+            }>;
+        }
+    ): vscode.TestMessage[] {
         const messages: vscode.TestMessage[] = [];
 
         // Create a message for each failed or aborted assertion
@@ -736,6 +767,14 @@ export class WinCCOATestController {
                     ExtensionOutputChannel.debug(
                         WinCCOATestController.LOG_SOURCE,
                         `Created ${assertion.status} message at ${assertion.location.uri.fsPath}:${assertion.location.range.start.line + 1}: ${assertion.message.substring(0, 50)}...`
+                    );
+                } else if (assertion.status === 'aborted' && testItem.uri && testItem.range) {
+                    // For aborted tests without location, use test definition location
+                    message.location = new vscode.Location(testItem.uri, testItem.range.start);
+                    
+                    ExtensionOutputChannel.debug(
+                        WinCCOATestController.LOG_SOURCE,
+                        `Aborted message: using test definition at ${testItem.uri.fsPath}:${testItem.range.start.line + 1}`
                     );
                 }
                 
@@ -753,6 +792,11 @@ export class WinCCOATestController {
                     message.location = assertion.location;
                     break;
                 }
+            }
+            
+            // If still no location and it's aborted, use test definition
+            if (!message.location && result.status === 'aborted' && testItem.uri && testItem.range) {
+                message.location = new vscode.Location(testItem.uri, testItem.range.start);
             }
             
             messages.push(message);

@@ -103,6 +103,7 @@ export class WinCCOATestController {
 
     /**
      * Build hierarchical test structure based on folder structure
+     * Shows project folder as root, preserves directory structure inside scripts/
      */
     private buildTestHierarchy(testFiles: ParsedTestFile[]): void {
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -110,8 +111,8 @@ export class WinCCOATestController {
             return;
         }
 
-        // Group test files by workspace folder first, then by directory
-        const workspaceFolderMap = new Map<vscode.WorkspaceFolder, Map<string, ParsedTestFile[]>>();
+        // Group test files by project folder (one level above scripts)
+        const projectFolderMap = new Map<string, Map<string, ParsedTestFile[]>>();
 
         for (const testFile of testFiles) {
             // Find which workspace folder this file belongs to
@@ -127,84 +128,132 @@ export class WinCCOATestController {
                 continue;
             }
             
-            // Get or create folder map for this workspace
-            if (!workspaceFolderMap.has(workspaceFolder)) {
-                workspaceFolderMap.set(workspaceFolder, new Map<string, ParsedTestFile[]>());
+            // Extract project folder (one level above scripts)
+            const projectFolder = this.extractProjectFolder(testFile.fileUri.fsPath, workspaceFolder.uri.fsPath);
+            
+            // Get or create folder map for this project
+            if (!projectFolderMap.has(projectFolder)) {
+                projectFolderMap.set(projectFolder, new Map<string, ParsedTestFile[]>());
             }
-            const folderMap = workspaceFolderMap.get(workspaceFolder)!;
+            const folderMap = projectFolderMap.get(projectFolder)!;
 
-            // Calculate relative path from workspace root
-            const relativePath = path.relative(workspaceFolder.uri.fsPath, testFile.fileUri.fsPath);
-            const dirPath = path.dirname(relativePath);
-
-            if (!folderMap.has(dirPath)) {
-                folderMap.set(dirPath, []);
+            // Extract path relative to project folder (includes scripts/)
+            const projectRelativePath = this.getPathRelativeToProject(testFile.fileUri.fsPath, projectFolder);
+            
+            if (!folderMap.has(projectRelativePath)) {
+                folderMap.set(projectRelativePath, []);
             }
-            folderMap.get(dirPath)!.push(testFile);
+            folderMap.get(projectRelativePath)!.push(testFile);
         }
 
-        // Create folder hierarchy for each workspace folder
-        let totalFolders = 0;
-        for (const [workspaceFolder, folderMap] of workspaceFolderMap) {
-            // Create workspace folder as top-level item
-            const workspaceFolderId = `workspace::${workspaceFolder.name}`;
-            let workspaceFolderItem = this.testController.items.get(workspaceFolderId);
+        // Create test hierarchy grouped by project folder
+        let totalProjects = 0;
+        for (const [projectFolder, folderMap] of projectFolderMap) {
+            const projectName = path.basename(projectFolder);
+            const projectId = `project::${projectFolder}`;
             
-            if (!workspaceFolderItem) {
-                workspaceFolderItem = this.testController.createTestItem(
-                    workspaceFolderId,
-                    workspaceFolder.name,
-                    workspaceFolder.uri
+            let projectItem = this.testController.items.get(projectId);
+            
+            if (!projectItem) {
+                projectItem = this.testController.createTestItem(
+                    projectId,
+                    projectName,
+                    vscode.Uri.file(projectFolder)
                 );
-                workspaceFolderItem.canResolveChildren = false;
-                this.testController.items.add(workspaceFolderItem);
+                projectItem.canResolveChildren = false;
+                this.testController.items.add(projectItem);
             }
 
+            // Build folder hierarchy inside scripts/
             const sortedDirs = Array.from(folderMap.keys()).sort();
             
             for (const dirPath of sortedDirs) {
                 const files = folderMap.get(dirPath)!;
                 
-                // Get or create folder item (relative to workspace root, under workspace item)
-                const folderItem = this.getOrCreateFolderItem(dirPath, workspaceFolder, workspaceFolderItem);
+                // Get or create folder item (relative to scripts, under project item)
+                const folderItem = this.getOrCreateFolderItemInProject(dirPath, projectFolder, projectName, projectItem);
                 
                 // Add test files to folder
                 for (const testFile of files) {
                     this.createTestItemsFromParsedFile(testFile, folderItem);
                 }
-                
-                totalFolders++;
             }
+            
+            totalProjects++;
         }
 
         ExtensionOutputChannel.success(
             WinCCOATestController.LOG_SOURCE,
-            `Built test hierarchy with ${totalFolders} folder(s) across ${workspaceFolderMap.size} workspace(s)`
+            `Built test hierarchy with ${totalProjects} project folder(s)`
         );
     }
 
     /**
-     * Get or create folder item for directory path
+     * Extract project folder path (one level above 'scripts')
+     * Example: /workspace/MyProject/scripts/tests/file.ctl -> /workspace/MyProject
      */
-    private getOrCreateFolderItem(dirPath: string, workspaceFolder: vscode.WorkspaceFolder, workspaceItem: vscode.TestItem): vscode.TestItem {
+    private extractProjectFolder(filePath: string, workspaceRoot: string): string {
+        // Find scripts folder in path
+        const scriptsIndex = filePath.indexOf(path.sep + 'scripts' + path.sep);
+        
+        if (scriptsIndex === -1) {
+            // Fallback: use workspace root if scripts not found
+            ExtensionOutputChannel.warn(
+                WinCCOATestController.LOG_SOURCE,
+                `Could not find 'scripts' folder in path: ${filePath}`
+            );
+            return workspaceRoot;
+        }
+
+        // Return path up to (but not including) scripts
+        return filePath.substring(0, scriptsIndex);
+    }
+
+    /**
+     * Get path relative to project folder (includes scripts/ and all subfolders)
+     * Example: /workspace/MyProject/scripts/tests/unit/file.ctl -> scripts/tests/unit
+     */
+    private getPathRelativeToProject(filePath: string, projectFolder: string): string {
+        const relativePath = path.relative(projectFolder, filePath);
+        const dirPath = path.dirname(relativePath);
+        
+        // Return empty string if file is directly in project folder, otherwise return the directory path
+        return dirPath === '.' ? '' : dirPath;
+    }
+
+    /**
+     * Get or create folder item for directory path inside scripts/
+     */
+    private getOrCreateFolderItemInProject(
+        dirPath: string, 
+        projectFolder: string, 
+        projectName: string,
+        projectItem: vscode.TestItem
+    ): vscode.TestItem {
+        // If empty path (file directly in scripts/), return project item
+        if (!dirPath || dirPath === '') {
+            return projectItem;
+        }
+
         const parts = dirPath.split(path.sep).filter(p => p.length > 0);
-        let currentParent: vscode.TestItem = workspaceItem; // Start under workspace item
+        let currentParent: vscode.TestItem = projectItem;
         let currentPath = '';
 
-        // Build folder hierarchy from root
+        // Build folder hierarchy from scripts/ root
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
             currentPath = currentPath ? path.join(currentPath, part) : part;
-            const folderId = `folder::${workspaceFolder.name}::${currentPath}`;
+            const folderId = `folder::${projectName}::${currentPath}`;
 
             let folderItem = currentParent.children.get(folderId);
 
             // Create folder item if it doesn't exist
             if (!folderItem) {
+                const fullPath = path.join(projectFolder, 'scripts', currentPath);
                 folderItem = this.testController.createTestItem(
                     folderId,
                     part,
-                    vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, currentPath))
+                    vscode.Uri.file(fullPath)
                 );
                 folderItem.canResolveChildren = false;
                 currentParent.children.add(folderItem);
@@ -611,6 +660,7 @@ export class WinCCOATestController {
 
     /**
      * Setup file watcher for test files
+     * Uses pattern to watch scripts folders at any depth
      */
     private setupFileWatcher(): void {
         // Dispose existing watchers
@@ -624,7 +674,7 @@ export class WinCCOATestController {
 
         // Create a watcher for each workspace folder
         for (const folder of workspaceFolders) {
-            const pattern = new vscode.RelativePattern(folder, 'scripts/**/*.ctl');
+            const pattern = new vscode.RelativePattern(folder, '**/scripts/**/*.ctl');
             const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
             watcher.onDidCreate(() => {
@@ -647,7 +697,7 @@ export class WinCCOATestController {
             
             ExtensionOutputChannel.debug(
                 WinCCOATestController.LOG_SOURCE, 
-                `File watcher active for: ${folder.name}/scripts/**/*.ctl`
+                `File watcher active for: ${folder.name}/**/scripts/**/*.ctl`
             );
         }
     }

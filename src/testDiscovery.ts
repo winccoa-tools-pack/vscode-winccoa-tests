@@ -3,6 +3,8 @@ import * as path from 'path';
 import { ExtensionOutputChannel } from './extensionOutput';
 import { TestParser, ParsedTestFile } from './testParser';
 
+export type TestDiscoveryMode = 'automatic' | 'workspace' | 'static';
+
 /**
  * Discovers test files in workspace
  */
@@ -10,10 +12,55 @@ export class TestDiscovery {
     private static readonly LOG_SOURCE = 'TestDiscovery';
 
     /**
-     * Discover all test files in workspace
-     * Searches for scripts/ folders and .ctl files containing OaTest classes
+     * Get current test discovery mode from configuration
+     */
+    public static getDiscoveryMode(): TestDiscoveryMode {
+        const config = vscode.workspace.getConfiguration('winccoaTests');
+        return config.get<TestDiscoveryMode>('testDiscoveryMode', 'automatic');
+    }
+
+    /**
+     * Get configured workspace folders to search (empty = all)
+     */
+    public static getConfiguredWorkspaceFolders(): string[] {
+        const config = vscode.workspace.getConfiguration('winccoaTests');
+        return config.get<string[]>('workspaceFolders', []);
+    }
+
+    /**
+     * Discover all test files based on configured mode
      */
     public static async discoverTests(): Promise<ParsedTestFile[]> {
+        const mode = this.getDiscoveryMode();
+        
+        ExtensionOutputChannel.info(this.LOG_SOURCE, `Using discovery mode: ${mode}`);
+
+        switch (mode) {
+            case 'automatic':
+                return await this.discoverAutomatic();
+            case 'workspace':
+                return await this.discoverWorkspace();
+            case 'static':
+                return await this.discoverStatic();
+            default:
+                ExtensionOutputChannel.warn(this.LOG_SOURCE, `Unknown discovery mode: ${mode}, falling back to workspace`);
+                return await this.discoverWorkspace();
+        }
+    }
+
+    /**
+     * Automatic mode: Use tests from currently selected project (WinCC OA Core)
+     */
+    private static async discoverAutomatic(): Promise<ParsedTestFile[]> {
+        ExtensionOutputChannel.info(this.LOG_SOURCE, 'Automatic mode - not yet implemented, falling back to workspace');
+        // TODO: Implement in next step - get current project from Core extension
+        return await this.discoverWorkspace();
+    }
+
+    /**
+     * Workspace mode: Search in configured workspace folders
+     */
+    private static async discoverWorkspace(): Promise<ParsedTestFile[]> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         
         if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -21,23 +68,51 @@ export class TestDiscovery {
             return [];
         }
 
-        ExtensionOutputChannel.info(this.LOG_SOURCE, `Discovering tests in ${workspaceFolders.length} workspace folder(s)`);
+        const configuredFolders = this.getConfiguredWorkspaceFolders();
+        let foldersToSearch = workspaceFolders;
+
+        // Filter to configured folders if specified
+        if (configuredFolders.length > 0) {
+            foldersToSearch = workspaceFolders.filter(f => configuredFolders.includes(f.name));
+            ExtensionOutputChannel.info(
+                this.LOG_SOURCE, 
+                `Searching in configured folders: ${foldersToSearch.map(f => f.name).join(', ')}`
+            );
+        } else {
+            ExtensionOutputChannel.info(
+                this.LOG_SOURCE,
+                `Searching in all workspace folders: ${foldersToSearch.map(f => f.name).join(', ')}`
+            );
+        }
 
         const allTestFiles: ParsedTestFile[] = [];
 
         // Search in each workspace folder
-        for (const folder of workspaceFolders) {
+        for (const folder of foldersToSearch) {
             const testFiles = await this.discoverInFolder(folder);
             allTestFiles.push(...testFiles);
         }
 
-        ExtensionOutputChannel.success(this.LOG_SOURCE, `Discovery complete: Found ${allTestFiles.length} test file(s) with ${allTestFiles.reduce((sum, f) => sum + f.testClasses.length, 0)} test class(es)`);
+        ExtensionOutputChannel.success(
+            this.LOG_SOURCE, 
+            `Discovery complete: Found ${allTestFiles.length} test file(s) with ${allTestFiles.reduce((sum, f) => sum + f.testClasses.length, 0)} test class(es)`
+        );
 
         return allTestFiles;
     }
 
     /**
+     * Static mode: Use static log path (fallback)
+     */
+    private static async discoverStatic(): Promise<ParsedTestFile[]> {
+        ExtensionOutputChannel.info(this.LOG_SOURCE, 'Static mode - using static log path configuration');
+        // Keep existing static behavior as fallback
+        return [];
+    }
+
+    /**
      * Discover tests in a single workspace folder
+     * Improved to find scripts folders at any depth, not just directly under workspace root
      */
     private static async discoverInFolder(folder: vscode.WorkspaceFolder): Promise<ParsedTestFile[]> {
         const testFiles: ParsedTestFile[] = [];
@@ -46,13 +121,16 @@ export class TestDiscovery {
         ExtensionOutputChannel.debug(this.LOG_SOURCE, `Searching in workspace folder: ${folderPath}`);
 
         try {
-            // Strategy: Search for scripts/ folders at any depth
-            // Pattern: scripts/**/*.ctl (searches from workspace root)
-            const scriptsPattern = new vscode.RelativePattern(folder, 'scripts/**/*.ctl');
+            // Improved strategy: Search for scripts/ folders at any depth
+            // Pattern: **/scripts/**/*.ctl finds scripts folders anywhere in the tree
+            const scriptsPattern = new vscode.RelativePattern(folder, '**/scripts/**/*.ctl');
             
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Using pattern: scripts/**/*.ctl`);
+            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Using pattern: **/scripts/**/*.ctl`);
 
-            const ctlFiles = await vscode.workspace.findFiles(scriptsPattern);
+            const ctlFiles = await vscode.workspace.findFiles(
+                scriptsPattern,
+                '**/node_modules/**' // Exclude node_modules
+            );
 
             ExtensionOutputChannel.debug(this.LOG_SOURCE, `Found ${ctlFiles.length} .ctl file(s) in scripts folders`);
 

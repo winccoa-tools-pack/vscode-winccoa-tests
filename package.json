@@ -3,7 +3,7 @@
   "displayName": "WinCC OA Test Explorer",
   "description": "Test Explorer integration for WinCC OA unit tests in Visual Studio Code",
   "publisher": "RichardJanisch",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "winccoa-tools-pack",
   "license": "MIT",
   "icon": "resources/wincc_oa_tests_icon_512.png",
@@ -56,6 +56,29 @@
     "configuration": {
       "title": "WinCC OA Test Explorer",
       "properties": {
+        "winccoaTests.testDiscoveryMode": {
+          "type": "string",
+          "enum": [
+            "automatic",
+            "workspace",
+            "static"
+          ],
+          "default": "automatic",
+          "description": "How to discover WinCC OA test files",
+          "enumDescriptions": [
+            "Automatic: Use tests from currently selected project (WinCC OA Core extension)",
+            "Workspace: Search in selected workspace folders for scripts/**/*.ctl",
+            "Static: Use configured static log path as fallback"
+          ]
+        },
+        "winccoaTests.workspaceFolders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Workspace folder names to search for tests (empty = all folders). Only used when testDiscoveryMode is 'workspace'."
+        },
         "winccoaTests.logLevel": {
           "type": "string",
           "enum": [

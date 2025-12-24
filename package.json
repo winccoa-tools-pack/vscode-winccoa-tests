@@ -60,15 +60,13 @@
           "type": "string",
           "enum": [
             "automatic",
-            "workspace",
-            "static"
+            "workspace"
           ],
           "default": "automatic",
           "description": "How to discover WinCC OA test files",
           "enumDescriptions": [
             "Automatic: Use tests from currently selected project (WinCC OA Core extension)",
-            "Workspace: Search in selected workspace folders for scripts/**/*.ctl",
-            "Static: Use configured static log path as fallback"
+            "Workspace: Search in selected workspace folders for scripts/**/*.ctl"
           ]
         },
         "winccoaTests.workspaceFolders": {
@@ -97,24 +95,6 @@
             "Detailed debugging information",
             "Very verbose trace information (for troubleshooting)"
           ]
-        },
-        "winccoaTests.logPathSource": {
-          "type": "string",
-          "enum": [
-            "workspace",
-            "static"
-          ],
-          "default": "workspace",
-          "description": "How to determine the log directory path",
-          "enumDescriptions": [
-            "Derive path from workspace root (workspace/log)",
-            "Use a static path configured in settings"
-          ]
-        },
-        "winccoaTests.staticLogPath": {
-          "type": "string",
-          "default": "",
-          "description": "Static log directory path (used when logPathSource is 'static'). Example: C:\\WinCC_OA\\MyProject\\log or /opt/WinCC_OA/MyProject/log"
         }
       }
     }

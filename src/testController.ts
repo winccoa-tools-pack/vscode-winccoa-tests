@@ -5,7 +5,6 @@ import { TestDiscovery } from './testDiscovery';
 import { ParsedTestFile } from './testParser';
 import { TestRunner } from './testRunner';
 import { JsonResultParser } from './jsonResultParser';
-import { PathResolver } from './pathResolver';
 
 /**
  * Main Test Controller for WinCC OA Tests
@@ -429,16 +428,26 @@ export class WinCCOATestController {
                 `Executing ${testCaseIds.length} test case(s): ${testCaseIds.join(', ')}`
             );
 
-            // Get project root directory (one level up from log directory)
-            const logDir = await PathResolver.getLogPath();
-            if (!logDir) {
-                ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, 'Could not determine log directory path');
-                const message = new vscode.TestMessage('Could not find log directory');
+            // Get project root directory from test file URI
+            const testFileUri = test.uri;
+            if (!testFileUri) {
+                ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, 'Test file URI not available');
+                const message = new vscode.TestMessage('Could not determine test file location');
                 run.failed(test, message);
                 return;
             }
 
-            const projectRoot = path.dirname(logDir);
+            // Project root is typically 2 levels up from scripts folder
+            // e.g., /project/scripts/tests/file.ctl -> /project
+            const testFilePath = testFileUri.fsPath;
+            const scriptsIndex = testFilePath.indexOf(path.sep + 'scripts' + path.sep);
+            if (scriptsIndex === -1) {
+                ExtensionOutputChannel.error(WinCCOATestController.LOG_SOURCE, 'Could not determine project root from test file path');
+                const message = new vscode.TestMessage('Invalid test file location');
+                run.failed(test, message);
+                return;
+            }
+            const projectRoot = testFilePath.substring(0, scriptsIndex);
             ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, `Project root: ${projectRoot}`);
 
             // Step 1: Delete old result files if they exist

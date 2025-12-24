@@ -3,7 +3,7 @@ import * as path from 'path';
 import { ExtensionOutputChannel } from './extensionOutput';
 import { TestParser, ParsedTestFile } from './testParser';
 
-export type TestDiscoveryMode = 'automatic' | 'workspace' | 'static';
+export type TestDiscoveryMode = 'automatic' | 'workspace';
 
 /**
  * Discovers test files in workspace
@@ -40,8 +40,6 @@ export class TestDiscovery {
                 return await this.discoverAutomatic();
             case 'workspace':
                 return await this.discoverWorkspace();
-            case 'static':
-                return await this.discoverStatic();
             default:
                 ExtensionOutputChannel.warn(this.LOG_SOURCE, `Unknown discovery mode: ${mode}, falling back to workspace`);
                 return await this.discoverWorkspace();
@@ -52,9 +50,208 @@ export class TestDiscovery {
      * Automatic mode: Use tests from currently selected project (WinCC OA Core)
      */
     private static async discoverAutomatic(): Promise<ParsedTestFile[]> {
-        ExtensionOutputChannel.info(this.LOG_SOURCE, 'Automatic mode - not yet implemented, falling back to workspace');
-        // TODO: Implement in next step - get current project from Core extension
-        return await this.discoverWorkspace();
+        ExtensionOutputChannel.info(this.LOG_SOURCE, 'Automatic mode - using current project from WinCC OA Core extension');
+        
+        // Try to get Core extension
+        const coreExtension = vscode.extensions.getExtension('winccoa-tools-pack.winccoa-core');
+        
+        if (!coreExtension) {
+            ExtensionOutputChannel.warn(
+                this.LOG_SOURCE,
+                'WinCC OA Core extension not found - falling back to workspace mode'
+            );
+            return await this.discoverWorkspace();
+        }
+
+        // Activate Core extension if needed
+        if (!coreExtension.isActive) {
+            ExtensionOutputChannel.debug(this.LOG_SOURCE, 'Activating WinCC OA Core extension...');
+            try {
+                await coreExtension.activate();
+            } catch (error) {
+                const err = error as Error;
+                ExtensionOutputChannel.error(
+                    this.LOG_SOURCE,
+                    `Failed to activate Core extension: ${err.message}`,
+                    err
+                );
+                return await this.discoverWorkspace();
+            }
+        }
+
+        const coreApi = coreExtension.exports;
+        
+        if (!coreApi || !coreApi.getCurrentProject) {
+            ExtensionOutputChannel.warn(
+                this.LOG_SOURCE,
+                'Core extension API not available - falling back to workspace mode'
+            );
+            return await this.discoverWorkspace();
+        }
+
+        const currentProject = coreApi.getCurrentProject();
+        
+        if (!currentProject || !currentProject.projectDir) {
+            ExtensionOutputChannel.info(
+                this.LOG_SOURCE,
+                'No project currently selected in Core extension - falling back to workspace mode'
+            );
+            return await this.discoverWorkspace();
+        }
+
+        ExtensionOutputChannel.success(
+            this.LOG_SOURCE,
+            `Using project from Core extension: ${currentProject.name || 'Unknown'}`
+        );
+        ExtensionOutputChannel.debug(this.LOG_SOURCE, `  Project directory: ${currentProject.projectDir}`);
+
+        // Get project path and check for subprojects in config
+        const projectPath = currentProject.projectDir;
+        const configPath = currentProject.configPath;
+        
+        const projectsToSearch: string[] = [projectPath];
+        
+        // Parse subprojects from config if available
+        if (configPath) {
+            try {
+                const subProjects = await this.parseSubProjectsFromConfig(configPath, projectPath);
+                if (subProjects.length > 0) {
+                    ExtensionOutputChannel.info(
+                        this.LOG_SOURCE,
+                        `Found ${subProjects.length} subproject(s) in config`
+                    );
+                    projectsToSearch.push(...subProjects);
+                }
+            } catch (error) {
+                const err = error as Error;
+                ExtensionOutputChannel.warn(
+                    this.LOG_SOURCE,
+                    `Failed to parse subprojects from config: ${err.message}`
+                );
+            }
+        }
+
+        ExtensionOutputChannel.info(
+            this.LOG_SOURCE,
+            `Searching for tests in ${projectsToSearch.length} project(s)`
+        );
+
+        const testFiles: ParsedTestFile[] = [];
+
+        // Search in main project and all subprojects
+        for (const projectDir of projectsToSearch) {
+            const scriptsPath = path.join(projectDir, 'scripts');
+
+            // Check if scripts folder exists
+            try {
+                await vscode.workspace.fs.stat(vscode.Uri.file(scriptsPath));
+            } catch {
+                ExtensionOutputChannel.trace(
+                    this.LOG_SOURCE,
+                    `No scripts folder in: ${projectDir}`
+                );
+                continue;
+            }
+
+            ExtensionOutputChannel.debug(
+                this.LOG_SOURCE,
+                `Searching in: ${scriptsPath}`
+            );
+
+            // Use glob to find all .ctl files in scripts folder (recursive)
+            const pattern = new vscode.RelativePattern(scriptsPath, '**/*.ctl');
+            const files = await vscode.workspace.findFiles(pattern, '**/node_modules/**');
+
+            ExtensionOutputChannel.trace(
+                this.LOG_SOURCE,
+                `  Found ${files.length} .ctl file(s)`
+            );
+
+            for (const fileUri of files) {
+                try {
+                    // Quick check if file contains OaTest
+                    const containsOaTest = await TestParser.containsOaTest(fileUri);
+                    
+                    if (!containsOaTest) {
+                        ExtensionOutputChannel.trace(this.LOG_SOURCE, `    Skipping (no OaTest): ${path.basename(fileUri.fsPath)}`);
+                        continue;
+                    }
+
+                    // Parse the file
+                    const parsedFile = await TestParser.parseFile(fileUri);
+                    
+                    if (parsedFile && parsedFile.testClasses.length > 0) {
+                        testFiles.push(parsedFile);
+                        ExtensionOutputChannel.trace(
+                            this.LOG_SOURCE,
+                            `    ✓ ${path.relative(scriptsPath, fileUri.fsPath)}: ${parsedFile.testClasses.length} test class(es)`
+                        );
+                    }
+                } catch (error) {
+                    const err = error as Error;
+                    ExtensionOutputChannel.error(
+                        this.LOG_SOURCE,
+                        `Error parsing ${fileUri.fsPath}: ${err.message}`,
+                        err
+                    );
+                }
+            }
+        }
+
+        ExtensionOutputChannel.success(
+            this.LOG_SOURCE,
+            `Automatic mode complete: Found ${testFiles.length} test file(s) with ${testFiles.reduce((sum, f) => sum + f.testClasses.length, 0)} test class(es)`
+        );
+
+        return testFiles;
+    }
+
+    /**
+     * Parse subprojects from config file
+     * Based on ProjectPathResolver from winccoa-ctrllang extension
+     */
+    private static async parseSubProjectsFromConfig(configPath: string, mainProjectPath: string): Promise<string[]> {
+        const subProjects: string[] = [];
+
+        try {
+            const configContent = await vscode.workspace.fs.readFile(vscode.Uri.file(configPath));
+            const configText = Buffer.from(configContent).toString('utf-8');
+            const lines = configText.split('\n');
+
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                
+                // Look for "proj_path" entries (can be absolute or relative)
+                // Example: proj_path = "../SubProject1"
+                // Example: proj_path = "/absolute/path/SubProject2"
+                const projPathMatch = trimmedLine.match(/^proj_path\s*=\s*"([^"]+)"/);
+                
+                if (projPathMatch) {
+                    let subProjectPath = projPathMatch[1];
+                    
+                    // Resolve relative paths relative to main project directory
+                    if (!path.isAbsolute(subProjectPath)) {
+                        subProjectPath = path.resolve(mainProjectPath, subProjectPath);
+                    }
+                    
+                    // Normalize and add to list
+                    subProjects.push(path.normalize(subProjectPath));
+                    ExtensionOutputChannel.trace(
+                        this.LOG_SOURCE,
+                        `    Found subproject: ${subProjectPath}`
+                    );
+                }
+            }
+        } catch (error) {
+            const err = error as Error;
+            ExtensionOutputChannel.error(
+                this.LOG_SOURCE,
+                `Error reading config file ${configPath}: ${err.message}`,
+                err
+            );
+        }
+
+        return subProjects;
     }
 
     /**
@@ -99,15 +296,6 @@ export class TestDiscovery {
         );
 
         return allTestFiles;
-    }
-
-    /**
-     * Static mode: Use static log path (fallback)
-     */
-    private static async discoverStatic(): Promise<ParsedTestFile[]> {
-        ExtensionOutputChannel.info(this.LOG_SOURCE, 'Static mode - using static log path configuration');
-        // Keep existing static behavior as fallback
-        return [];
     }
 
     /**

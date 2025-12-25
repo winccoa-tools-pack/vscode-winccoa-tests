@@ -857,19 +857,19 @@ export class WinCCOATestController {
             const pattern = new vscode.RelativePattern(folder, '**/scripts/**/*.ctl');
             const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-            watcher.onDidCreate(() => {
-                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, 'File created, refreshing tests');
-                this.discoverTests();
+            watcher.onDidCreate((uri) => {
+                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `File created: ${uri.fsPath}`);
+                this.handleFileCreated(uri);
             });
             
-            watcher.onDidChange(() => {
-                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, 'File changed, refreshing tests');
-                this.discoverTests();
+            watcher.onDidChange((uri) => {
+                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `File changed: ${uri.fsPath}`);
+                this.handleFileChanged(uri);
             });
             
-            watcher.onDidDelete(() => {
-                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, 'File deleted, refreshing tests');
-                this.discoverTests();
+            watcher.onDidDelete((uri) => {
+                ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `File deleted: ${uri.fsPath}`);
+                this.handleFileDeleted(uri);
             });
 
             this.fileWatchers.push(watcher);
@@ -880,6 +880,161 @@ export class WinCCOATestController {
                 `File watcher active for: ${folder.name}/**/scripts/**/*.ctl`
             );
         }
+    }
+
+    /**
+     * Handle file creation - parse only the new file
+     */
+    private async handleFileCreated(uri: vscode.Uri): Promise<void> {
+        const parsedFile = await TestDiscovery.parseTestFile(uri);
+        
+        if (!parsedFile) {
+            ExtensionOutputChannel.debug(
+                WinCCOATestController.LOG_SOURCE,
+                `Created file is not a test file: ${uri.fsPath}`
+            );
+            return;
+        }
+
+        // Store parsed file info
+        this.parsedTestFiles.set(uri.fsPath, parsedFile);
+
+        // Add to test hierarchy
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+        if (!workspaceFolder) {
+            return;
+        }
+
+        const projectFolder = this.extractProjectFolder(uri.fsPath, workspaceFolder.uri.fsPath);
+        const projectName = path.basename(projectFolder);
+        const projectId = `project::${projectFolder}`;
+
+        // Get or create project item
+        let projectItem = this.testController.items.get(projectId);
+        if (!projectItem) {
+            projectItem = this.testController.createTestItem(
+                projectId,
+                projectName,
+                vscode.Uri.file(projectFolder)
+            );
+            projectItem.canResolveChildren = false;
+            this.testController.items.add(projectItem);
+        }
+
+        // Get folder path and create folder items
+        const dirPath = this.getPathRelativeToProject(uri.fsPath, projectFolder);
+        const folderItem = this.getOrCreateFolderItemInProject(dirPath, projectFolder, projectName, projectItem);
+
+        // Add test file items
+        this.createTestItemsFromParsedFile(parsedFile, folderItem);
+
+        ExtensionOutputChannel.success(
+            WinCCOATestController.LOG_SOURCE,
+            `Added new test file: ${path.basename(uri.fsPath)}`
+        );
+    }
+
+    /**
+     * Handle file change - re-parse only the changed file
+     */
+    private async handleFileChanged(uri: vscode.Uri): Promise<void> {
+        const parsedFile = await TestDiscovery.parseTestFile(uri);
+        
+        if (!parsedFile) {
+            // File is no longer a test file - remove it
+            this.handleFileDeleted(uri);
+            return;
+        }
+
+        // Update stored parsed file info
+        this.parsedTestFiles.set(uri.fsPath, parsedFile);
+
+        // Remove old test items and re-add
+        this.removeTestItemsForFile(uri);
+        
+        // Re-add to test hierarchy
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+        if (!workspaceFolder) {
+            return;
+        }
+
+        const projectFolder = this.extractProjectFolder(uri.fsPath, workspaceFolder.uri.fsPath);
+        const projectName = path.basename(projectFolder);
+        const projectId = `project::${projectFolder}`;
+
+        const projectItem = this.testController.items.get(projectId);
+        if (!projectItem) {
+            // Project doesn't exist yet - do full rediscovery
+            ExtensionOutputChannel.warn(
+                WinCCOATestController.LOG_SOURCE,
+                `Project item not found for changed file, triggering full refresh`
+            );
+            this.discoverTests();
+            return;
+        }
+
+        const dirPath = this.getPathRelativeToProject(uri.fsPath, projectFolder);
+        const folderItem = this.getOrCreateFolderItemInProject(dirPath, projectFolder, projectName, projectItem);
+
+        // Add updated test file items
+        this.createTestItemsFromParsedFile(parsedFile, folderItem);
+
+        ExtensionOutputChannel.success(
+            WinCCOATestController.LOG_SOURCE,
+            `Updated test file: ${path.basename(uri.fsPath)}`
+        );
+    }
+
+    /**
+     * Handle file deletion - remove test items for deleted file
+     */
+    private handleFileDeleted(uri: vscode.Uri): void {
+        // Remove from parsed files map
+        this.parsedTestFiles.delete(uri.fsPath);
+
+        // Remove test items
+        this.removeTestItemsForFile(uri);
+
+        ExtensionOutputChannel.success(
+            WinCCOATestController.LOG_SOURCE,
+            `Removed test file: ${path.basename(uri.fsPath)}`
+        );
+    }
+
+    /**
+     * Remove all test items associated with a specific file
+     */
+    private removeTestItemsForFile(uri: vscode.Uri): void {
+        const fileId = `file::${uri.fsPath}`;
+        
+        // Find and remove the file item from the tree
+        this.testController.items.forEach(projectItem => {
+            this.removeFileItemRecursive(projectItem, fileId);
+        });
+    }
+
+    /**
+     * Recursively search and remove file item from test hierarchy
+     */
+    private removeFileItemRecursive(parent: vscode.TestItem, fileId: string): boolean {
+        let found = false;
+        
+        parent.children.forEach(child => {
+            if (child.id === fileId) {
+                parent.children.delete(child.id);
+                found = true;
+            } else if (child.children.size > 0) {
+                const removedFromChild = this.removeFileItemRecursive(child, fileId);
+                
+                // If child folder is now empty, remove it too
+                if (removedFromChild && child.children.size === 0 && child.id.startsWith('folder::')) {
+                    parent.children.delete(child.id);
+                    found = true;
+                }
+            }
+        });
+        
+        return found;
     }
 
     /**

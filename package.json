@@ -3,7 +3,7 @@
   "displayName": "WinCC OA Test Explorer",
   "description": "Test Explorer integration for WinCC OA unit tests in Visual Studio Code",
   "publisher": "RichardJanisch",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": "Richard Janisch",
   "license": "MIT",
   "icon": "resources/wincc_oa_tests_icon_512.png",

@@ -351,11 +351,11 @@ export class TestDiscovery {
     }
 
     /**
-     * Discover tests matching a specific file URI
+     * Parse a single test file
      * Useful for incremental updates when a file changes
      */
-    public static async discoverInFile(fileUri: vscode.Uri): Promise<ParsedTestFile | undefined> {
-        ExtensionOutputChannel.debug(this.LOG_SOURCE, `Discovering tests in single file: ${fileUri.fsPath}`);
+    public static async parseTestFile(fileUri: vscode.Uri): Promise<ParsedTestFile | undefined> {
+        ExtensionOutputChannel.debug(this.LOG_SOURCE, `Parsing single test file: ${fileUri.fsPath}`);
 
         // Check if file is in a scripts folder
         if (!fileUri.fsPath.includes('/scripts/') && !fileUri.fsPath.includes('\\scripts\\')) {
@@ -363,14 +363,16 @@ export class TestDiscovery {
             return undefined;
         }
 
-        // Check if contains OaTest
-        const containsOaTest = await TestParser.containsOaTest(fileUri);
-        if (!containsOaTest) {
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, `File does not contain OaTest: ${fileUri.fsPath}`);
-            return undefined;
-        }
-
-        // Parse the file
+        // Parse the file (will return undefined if no OaTest classes found)
         return await TestParser.parseFile(fileUri);
+    }
+
+    /**
+     * Discover tests matching a specific file URI
+     * Useful for incremental updates when a file changes
+     * @deprecated Use parseTestFile instead
+     */
+    public static async discoverInFile(fileUri: vscode.Uri): Promise<ParsedTestFile | undefined> {
+        return this.parseTestFile(fileUri);
     }
 }

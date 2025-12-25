@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2025-12-25
+
+### Changed
+- **Performance Optimization**: File watcher now only re-parses changed files instead of all files
+- Incremental file updates: Created files are parsed and added individually
+- Changed files are re-parsed and updated in-place without full test tree rebuild
+- Deleted files are removed from test tree without affecting other files
+- Added `TestDiscovery.parseTestFile()` method for single file parsing
+
+### Fixed
+- Reduced unnecessary full workspace scans on file changes
+- Eliminated redundant test discovery on every file modification
+- Empty folders are now automatically cleaned up when last test file is removed
+
+## [0.2.1] - 2025-12-25
+
 ### Fixed
 - Fixed test execution arguments - now passes only testCaseId instead of `single start testCaseId`
 - Corrected integration with Script Actions `executeScriptWithArgs` command

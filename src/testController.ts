@@ -19,6 +19,9 @@ export class WinCCOATestController {
     private testQueue: Promise<void> = Promise.resolve();
     private isTestRunning: boolean = false;
 
+    // Map to store parsed test files info (for individual test support check)
+    private parsedTestFiles: Map<string, ParsedTestFile> = new Map();
+
     constructor(
         private context: vscode.ExtensionContext
     ) {
@@ -272,6 +275,9 @@ export class WinCCOATestController {
         
         ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Creating test items for: ${fileName}`);
 
+        // Store parsed file info for later use
+        this.parsedTestFiles.set(parsedFile.fileUri.toString(), parsedFile);
+
         // Create test item for each test class
         for (const testClass of parsedFile.testClasses) {
             const classId = `${parsedFile.fileUri.toString()}::${testClass.className}`;
@@ -515,21 +521,28 @@ export class WinCCOATestController {
 
             // Collect all test case IDs for this test run
             const testCaseIds: string[] = [];
+            let isIndividualTest = false;
             
             // Check if this is a test class or individual test case
             if (test.children.size > 0) {
-                // Test class - get all child test cases
+                // Test class - executing all tests in the class
                 test.children.forEach(child => {
                     testCaseIds.push(child.label);
                 });
+                isIndividualTest = false;
             } else {
                 // Individual test case
                 testCaseIds.push(test.label);
+                isIndividualTest = true;
             }
+
+            // Check if file supports individual test execution
+            const parsedFile = this.parsedTestFiles.get(test.uri.toString());
+            const supportsIndividualTests = parsedFile?.supportsIndividualTests ?? false;
 
             ExtensionOutputChannel.info(
                 WinCCOATestController.LOG_SOURCE,
-                `Executing ${testCaseIds.length} test case(s): ${testCaseIds.join(', ')}`
+                `Executing ${isIndividualTest ? 'individual test' : 'test class'}: ${testCaseIds.join(', ')} (supports individual: ${supportsIndividualTests})`
             );
 
             // Get the main project root where JSON results will be written
@@ -555,7 +568,27 @@ export class WinCCOATestController {
             JsonResultParser.createResultFiles(mainProjectRoot);
 
             // Step 3: Execute the test file via Script Actions
-            const executionStarted = await TestRunner.executeTestFile(test.uri);
+            // If individual test AND file supports it, use executeScriptWithArgs
+            // Otherwise use normal executeScript (runs whole file)
+            let executionStarted: boolean;
+            
+            if (isIndividualTest && supportsIndividualTests) {
+                // Execute single test with arguments
+                ExtensionOutputChannel.info(
+                    WinCCOATestController.LOG_SOURCE,
+                    `Executing individual test with args: ${testCaseIds[0]}`
+                );
+                executionStarted = await TestRunner.executeScriptWithArgs(test.uri, testCaseIds[0]);
+            } else {
+                // Execute entire file (class with all tests)
+                if (isIndividualTest && !supportsIndividualTests) {
+                    ExtensionOutputChannel.warn(
+                        WinCCOATestController.LOG_SOURCE,
+                        'Individual test selected but file does not support it - running entire file instead'
+                    );
+                }
+                executionStarted = await TestRunner.executeTestFile(test.uri);
+            }
 
             if (!executionStarted) {
                 JsonResultParser.deleteResultFiles(mainProjectRoot);

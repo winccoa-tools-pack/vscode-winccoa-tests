@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed test execution arguments - now passes only testCaseId instead of `single start testCaseId`
+- Corrected integration with Script Actions `executeScriptWithArgs` command
+
+### Known Issues
+- **WinCC OA Limitation**: When executing single test cases, WinCC OA currently does not generate a full test report. The infrastructure in this extension is prepared for single test execution, but full reporting functionality depends on future WinCC OA improvements.
+
 ## [0.2.0] - 2025-12-24
 
 ### Added

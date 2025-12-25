@@ -65,6 +65,56 @@ export class TestRunner {
     }
 
     /**
+     * Execute a test file with arguments using Script Actions
+     * 
+     * @param fileUri URI of the test file to execute
+     * @param testCaseId ID of the test case to execute
+     * @returns true if execution started successfully
+     */
+    public static async executeScriptWithArgs(fileUri: vscode.Uri, testCaseId: string): Promise<boolean> {
+        try {
+            // Check if Script Actions is available
+            if (!this.isScriptActionsAvailable()) {
+                ExtensionOutputChannel.warn(
+                    this.LOG_SOURCE,
+                    'WinCC OA Script Actions extension is not available. Please install it to run tests.'
+                );
+                
+                vscode.window.showWarningMessage(
+                    'WinCC OA Script Actions extension is required to run tests.',
+                    'Install Extension',
+                    'Dismiss'
+                ).then(selection => {
+                    if (selection === 'Install Extension') {
+                        vscode.commands.executeCommand('workbench.extensions.search', '@id:RichardJanisch.winccoa-script-actions');
+                    }
+                });
+                
+                return false;
+            }
+
+            ExtensionOutputChannel.info(this.LOG_SOURCE, `Executing test with args: ${fileUri.fsPath} ${testCaseId}`);
+
+            // Pass only the testCaseId as argument
+            await vscode.commands.executeCommand('winccoa.executeScriptWithArgs', fileUri, testCaseId);
+            
+            ExtensionOutputChannel.success(
+                this.LOG_SOURCE,
+                `Test execution with args started successfully`
+            );
+            return true;
+
+        } catch (error) {
+            ExtensionOutputChannel.error(
+                this.LOG_SOURCE,
+                `Failed to execute test with args: ${fileUri.fsPath}`,
+                error as Error
+            );
+            return false;
+        }
+    }
+
+    /**
      * Get list of available Script Actions commands (for debugging)
      */
     public static async getAvailableScriptActionsCommands(): Promise<string[]> {

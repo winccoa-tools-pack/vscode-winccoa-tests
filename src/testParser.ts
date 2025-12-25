@@ -24,6 +24,7 @@ export interface ParsedTestClass {
 export interface ParsedTestFile {
     fileUri: vscode.Uri;
     testClasses: ParsedTestClass[];
+    supportsIndividualTests: boolean;
 }
 
 /**
@@ -40,6 +41,8 @@ export class TestParser {
     private static readonly STRING_LITERAL_PATTERN = /"([^"]+)"/g;
     // 3.20 format: public int test*() methods
     private static readonly TEST_METHOD_PATTERN = /public\s+int\s+(test\w*)\s*\(/gm;
+    // Pattern for main function with string parameter
+    private static readonly MAIN_WITH_STRING_PARAM_PATTERN = /\b(void\s+)?main\s*\(\s*string\s+\w+\s*\)/;
 
     /**
      * Parse a CTRL file for test classes and test cases
@@ -62,9 +65,19 @@ export class TestParser {
 
             ExtensionOutputChannel.info(this.LOG_SOURCE, `Found ${testClasses.length} test class(es) in: ${fileUri.fsPath}`);
 
+            // Check if file supports individual test execution
+            const supportsIndividualTests = this.checkSupportsIndividualTests(content);
+            
+            if (supportsIndividualTests) {
+                ExtensionOutputChannel.debug(this.LOG_SOURCE, `File supports individual test execution: ${fileUri.fsPath}`);
+            } else {
+                ExtensionOutputChannel.debug(this.LOG_SOURCE, `File does NOT support individual test execution: ${fileUri.fsPath}`);
+            }
+
             return {
                 fileUri,
-                testClasses
+                testClasses,
+                supportsIndividualTests
             };
         } catch (error) {
             ExtensionOutputChannel.error(this.LOG_SOURCE, `Failed to parse file: ${fileUri.fsPath}`, error as Error);
@@ -265,6 +278,45 @@ export class TestParser {
             // Quick check without full parsing
             return content.includes(': OaTest') || content.includes(':OaTest');
         } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if file supports individual test execution
+     * Requirements:
+     * 1. main() function has string parameter: main(string testCaseId)
+     * 2. main() function contains startSingle call
+     */
+    private static checkSupportsIndividualTests(content: string): boolean {
+        try {
+            // Check 1: main function with string parameter
+            if (!this.MAIN_WITH_STRING_PARAM_PATTERN.test(content)) {
+                ExtensionOutputChannel.debug(this.LOG_SOURCE, 'No main(string ...) signature found');
+                return false;
+            }
+
+            // Check 2: Extract main function body and check for startSingle
+            const mainBodyMatch = content.match(/\bmain\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/);
+            if (!mainBodyMatch) {
+                ExtensionOutputChannel.debug(this.LOG_SOURCE, 'Could not extract main function body');
+                return false;
+            }
+
+            const mainBody = mainBodyMatch[1];
+            if (!mainBody.includes('startSingle')) {
+                ExtensionOutputChannel.debug(this.LOG_SOURCE, 'No startSingle call found in main()');
+                return false;
+            }
+
+            ExtensionOutputChannel.debug(this.LOG_SOURCE, 'File supports individual test execution ✓');
+            return true;
+
+        } catch (error) {
+            ExtensionOutputChannel.warn(
+                this.LOG_SOURCE,
+                `Error checking individual test support - defaulting to false: ${error}`
+            );
             return false;
         }
     }

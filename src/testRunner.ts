@@ -45,7 +45,7 @@ export class TestRunner {
 
             ExtensionOutputChannel.info(this.LOG_SOURCE, `Executing test file: ${fileUri.fsPath}`);
 
-            // Execute via Script Actions command
+            // Execute via Script Actions command (uses -n flag by default for faster startup)
             await vscode.commands.executeCommand('winccoa.executeScript', fileUri);
             
             ExtensionOutputChannel.success(
@@ -95,7 +95,7 @@ export class TestRunner {
 
             ExtensionOutputChannel.info(this.LOG_SOURCE, `Executing test with args: ${fileUri.fsPath} ${testCaseId}`);
 
-            // Pass only the testCaseId as argument
+            // Pass only the testCaseId as argument (uses -n flag by default)
             await vscode.commands.executeCommand('winccoa.executeScriptWithArgs', fileUri, testCaseId);
             
             ExtensionOutputChannel.success(

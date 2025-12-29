@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2025-12-29
+
+### Changed
+- **Performance**: Tests now run with `-n` flag (no event connection) for faster startup
+- Updated to use Script Actions 0.4.0+ default commands (executeScript, executeScriptWithArgs)
+- Reduced test execution overhead by skipping unnecessary event manager connection
+
 ## [0.2.2] - 2025-12-25
 
 ### Changed

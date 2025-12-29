@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2025-12-29
+
+### Added
+- **Test Cancellation**: Stop running tests via VS Code Test Explorer stop button
+- Direct process spawning with kill support for immediate test termination
+- Core extension API integration for automatic path detection mode
+
+### Changed
+- Reduced test completion timeout from 10s to 5s for faster feedback
+- Improved cancellation responsiveness with polling loop check
+
 ## [0.2.3] - 2025-12-29
 
 ### Changed

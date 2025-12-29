@@ -19,6 +19,9 @@ export class WinCCOATestController {
     private testQueue: Promise<void> = Promise.resolve();
     private isTestRunning: boolean = false;
 
+    // Current cancellation token for stopping running tests
+    private currentCancelToken: vscode.CancellationToken | null = null;
+
     // Map to store parsed test files info (for individual test support check)
     private parsedTestFiles: Map<string, ParsedTestFile> = new Map();
 
@@ -458,6 +461,7 @@ export class WinCCOATestController {
 
             try {
                 this.isTestRunning = true;
+                this.currentCancelToken = token;
                 ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, 'Acquired test execution lock');
 
                 // Run each test
@@ -470,10 +474,11 @@ export class WinCCOATestController {
                     run.started(test);
                     ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Running: ${test.label}`);
 
-                    await this.executeTest(test, run);
+                    await this.executeTest(test, run, token);
                 }
             } finally {
                 this.isTestRunning = false;
+                this.currentCancelToken = null;
                 ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, 'Released test execution lock');
                 run.end();
             }
@@ -506,7 +511,8 @@ export class WinCCOATestController {
      */
     private async executeTest(
         test: vscode.TestItem,
-        run: vscode.TestRun
+        run: vscode.TestRun,
+        token: vscode.CancellationToken
     ): Promise<void> {
         try {
             ExtensionOutputChannel.debug(WinCCOATestController.LOG_SOURCE, `Executing test: ${test.label}`);
@@ -578,7 +584,7 @@ export class WinCCOATestController {
                     WinCCOATestController.LOG_SOURCE,
                     `Executing individual test with args: ${testCaseIds[0]}`
                 );
-                executionStarted = await TestRunner.executeScriptWithArgs(test.uri, testCaseIds[0]);
+                executionStarted = await TestRunner.executeScriptWithArgs(test.uri, testCaseIds[0], token);
             } else {
                 // Execute entire file (class with all tests)
                 if (isIndividualTest && !supportsIndividualTests) {
@@ -587,7 +593,7 @@ export class WinCCOATestController {
                         'Individual test selected but file does not support it - running entire file instead'
                     );
                 }
-                executionStarted = await TestRunner.executeTestFile(test.uri);
+                executionStarted = await TestRunner.executeTestFile(test.uri, token);
             }
 
             if (!executionStarted) {
@@ -599,7 +605,7 @@ export class WinCCOATestController {
 
             // Step 4: Wait a bit for test execution to complete and write results
             ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Waiting for test execution to complete...');
-            const resultsAvailable = await this.waitForTestCompletion(mainProjectRoot, 10000);
+            const resultsAvailable = await this.waitForTestCompletion(mainProjectRoot, 5000, token);
             
             if (!resultsAvailable) {
                 // Timeout or no results - test execution likely failed
@@ -672,13 +678,22 @@ export class WinCCOATestController {
 
     /**
      * Wait for test completion by polling the result files
-     * @returns true if results were written, false if timeout
+     * @returns true if results were written, false if timeout or cancelled
      */
-    private async waitForTestCompletion(projectRoot: string, timeoutMs: number): Promise<boolean> {
+    private async waitForTestCompletion(projectRoot: string, timeoutMs: number, token?: vscode.CancellationToken): Promise<boolean> {
         const startTime = Date.now();
         const pollInterval = 500; // Check every 500ms
 
         while (Date.now() - startTime < timeoutMs) {
+            // Check for cancellation first
+            if (token?.isCancellationRequested) {
+                ExtensionOutputChannel.info(
+                    WinCCOATestController.LOG_SOURCE,
+                    'Test execution cancelled by user'
+                );
+                return false;
+            }
+
             // Check if fullResult.json has content (not just {})
             try {
                 const fs = await import('fs');

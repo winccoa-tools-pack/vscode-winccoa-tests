@@ -5,7 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2025-12-30
+
+### First Stable Release
+
+**Core Features:**
+- Automatic test discovery for WinCC OA 3.19 and 3.20 test formats
+- Native VS Code Test Explorer integration
+- Test execution via WinCC OA Script Actions extension
+- Test cancellation support (stop button)
+- Incremental file watcher updates for better performance
+- Fast execution with `-n` flag (no event connection)
+- Auto-detection via WinCC OA Control extension
+
+**Current Limitations:**
+- Individual test case execution not yet supported (runs entire file)
+- Test debugging not yet implemented
+- Occasional false positives in test discovery with complex files
+
+### Changed
+- Updated documentation with unified structure and real-world examples
+- Added disclaimer about first stable release status
+
+---
 
 ## [0.2.4] - 2025-12-29
 

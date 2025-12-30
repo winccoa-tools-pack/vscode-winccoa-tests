@@ -335,7 +335,7 @@ export class WinCCOATestController {
 
         if (discoveryMode === 'automatic') {
             // Get main project from Core extension
-            const coreExtension = vscode.extensions.getExtension('winccoa-tools-pack.winccoa-core');
+            const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-control');
             
             if (coreExtension) {
                 if (!coreExtension.isActive) {

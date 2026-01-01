@@ -21,7 +21,7 @@
 
 ## 🎬 See It In Action
 
-![WinCC OA Test Explorer Demo](resources/Animation.gif)
+![WinCC OA Test Explorer Demo](https://github.com/winccoa-tools-pack/vscode-winccoa-tests/blob/develop/images/Animation.gif?raw=true)
 
 ---
 

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![VS Code](https://img.shields.io/badge/VS%20Code-^1.106.2-007ACC.svg)
 
@@ -15,7 +15,13 @@
 ---
 
 > **Disclaimer:**
-> This is the first stable release (v1.0.0) of the WinCC OA Test Explorer extension. Not all features are fully implemented and some functions may not work perfectly yet. Please report any issues you encounter.
+> This is the first stable release (v1.0.3) of the WinCC OA Test Explorer extension. Not all features are fully implemented and some functions may not work perfectly yet. Please report any issues you encounter.
+
+---
+
+## 🎬 See It In Action
+
+![WinCC OA Test Explorer Demo](https://github.com/winccoa-tools-pack/vscode-winccoa-tests/blob/develop/images/Animation.gif?raw=true)
 
 ---
 
@@ -23,11 +29,129 @@
 
 ### 🔍 Test Discovery
 - Automatic discovery of WinCC OA test files in workspace
-- Support for both WinCC OA 3.19 and 3.20 test formats:
-  - **3.19**: `getAllTestCaseIds()` with switch/case structure
-  - **3.20**: `public int test*()` methods
+- Support for both WinCC OA 3.19 and 3.20 test formats
 - Auto-refresh on file changes with incremental updates
 - Workspace folder hierarchy
+
+#### Supported Test Patterns
+
+**WinCC OA 3.19 Format:**
+```c
+// $License: NOLICENSE
+/** Tests for the library: scripts/libs/$origLibRelPath.
+
+  @file $relPath
+  @test Unit tests for the library: scripts/libs/$origLibRelPath
+  @copyright $copyright
+  @author RichardJanisch
+ */
+
+//--------------------------------------------------------------------------------
+// Libraries used (#uses)
+#uses "$origLibRelPathWithoutExtension" // tested object
+#uses "classes/oaTest/OaTest" // oaTest basic class
+
+//--------------------------------------------------------------------------------
+// Variables and Constants
+
+//--------------------------------------------------------------------------------
+/**
+*/
+class TstHelloWorld : OaTest
+{
+  //------------------------------------------------------------------------------
+  // List of the test cases
+  protected dyn_string getAllTestCaseIds()
+  {
+    return makeDynString("$origLibName_");
+  }
+
+  //------------------------------------------------------------------------------
+  protected int startTestCase(const string &tcId)
+  {
+    //----------------------------------------------------------------------------
+    switch (tcId)
+    {
+      //--------------------------------------------------------------------------
+      case "$origLibName_":
+      {
+        // Test your script here.
+        assertEqual("currentValue", "expectedValue");
+        return 0;
+      }
+    }
+
+    return -1;
+  }
+};
+
+//--------------------------------------------------------------------------------
+main()
+{
+  TstHelloWorld test = TstHelloWorld();
+  test.startAll();
+  exit(0);
+}
+```
+
+**WinCC OA 3.20 Format:**
+```cpp
+// $License: NOLICENSE
+/** Tests for the library: scripts/libs/$origLibRelPath.
+
+  @file $relPath
+  @test Unit tests for the library: scripts/libs/$origLibRelPath
+  @copyright $copyright
+  @author RichardJanisch
+ */
+
+//--------------------------------------------------------------------------------
+// Libraries used (#uses)
+#uses "$origLibRelPathWithoutExtension" // tested object
+#uses "classes/oaTest/OaTest" // oaTest basic class
+
+//--------------------------------------------------------------------------------
+// Variables and Constants
+
+//--------------------------------------------------------------------------------
+/**
+*/
+class TstPass : OaTest
+{
+  //------------------------------------------------------------------------------
+  // List of the test cases
+  protected dyn_string getAllTestCaseIds()
+  {
+    return makeDynString("$origLibName_");
+  }
+
+  //------------------------------------------------------------------------------
+  protected int startTestCase(const string &tcId)
+  {
+    //----------------------------------------------------------------------------
+    switch (tcId)
+    {
+      //--------------------------------------------------------------------------
+      case "$origLibName_":
+      {
+        // Test your script here.
+        assertEqual("expectedValue", "expectedValue");
+        return 0;
+      }
+    }
+
+    return -1;
+  }
+};
+
+//--------------------------------------------------------------------------------
+main()
+{
+  TstPass test = TstPass();
+  test.startAll();
+  exit(0);
+}
+```
 
 ### 🚀 Test Execution
 - Run individual test files or entire folders
@@ -48,28 +172,6 @@
 - Recursive folder execution
 - Multi-workspace support
 - Auto-detection via WinCC OA Control extension
-
----
-
-## 🚀 Installation
-
-1. **Install from VSIX** (Recommended):
-   ```bash
-   code --install-extension winccoa-vscode-tests-1.0.0.vsix
-   ```
-
-2. **Or via VS Code Extensions**:
-   - Open Extensions (`Ctrl+Shift+X`)
-   - Search for "WinCC OA Test Explorer"
-   - Click Install
-
-3. **Install Dependencies**:
-   - **WinCC OA Script Actions** extension (required for test execution)
-   - **WinCC OA Control** extension (optional, for auto-detection)
-
-4. **Open your WinCC OA project**:
-   - Extension auto-detects test files in `scripts/tests/**/*.ctl`
-   - View tests in Test Explorer sidebar (beaker icon)
 
 ---
 

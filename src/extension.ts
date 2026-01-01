@@ -62,7 +62,7 @@ async function setupCoreExtensionIntegration(context: vscode.ExtensionContext) {
         return;
     }
 
-    const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-control');
+    const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-project-admin');
     
     if (!coreExtension) {
         ExtensionOutputChannel.warn('CoreIntegration', 'WinCC OA Core extension not found - automatic mode will fall back to workspace mode');

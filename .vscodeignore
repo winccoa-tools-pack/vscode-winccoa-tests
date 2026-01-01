@@ -12,3 +12,5 @@ tsconfig.json
 Makefile
 src/
 test-samples/
+!images/**/*.gif
+!resources/**/*.gif

@@ -54,7 +54,7 @@ export class TestRunner {
             
             if (pathSource === 'automatic') {
                 // Get from Core extension API
-                const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-control');
+                const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-project-admin');
                 if (coreExtension?.isActive) {
                     const coreApi = coreExtension.exports;
                     const currentProject = coreApi.getCurrentProject?.();
@@ -155,7 +155,7 @@ export class TestRunner {
             
             if (pathSource === 'automatic') {
                 // Get from Core extension API
-                const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-control');
+                const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-project-admin');
                 if (coreExtension?.isActive) {
                     const coreApi = coreExtension.exports;
                     const currentProject = coreApi.getCurrentProject?.();

@@ -53,7 +53,7 @@ export class TestDiscovery {
         ExtensionOutputChannel.info(this.LOG_SOURCE, 'Automatic mode - using current project from WinCC OA Core extension');
         
         // Try to get Core extension
-        const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-control');
+        const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-project-admin');
         
         if (!coreExtension) {
             ExtensionOutputChannel.warn(

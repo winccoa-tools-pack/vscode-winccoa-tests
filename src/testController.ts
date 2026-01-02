@@ -118,6 +118,7 @@ export class WinCCOATestController {
 
         // Group test files by project folder (one level above scripts)
         const projectFolderMap = new Map<string, Map<string, ParsedTestFile[]>>();
+        const mode = TestDiscovery.getDiscoveryMode();
 
         for (const testFile of testFiles) {
             // Find which workspace folder this file belongs to
@@ -125,16 +126,39 @@ export class WinCCOATestController {
                 testFile.fileUri.fsPath.startsWith(folder.uri.fsPath)
             );
 
-            if (!workspaceFolder) {
-                ExtensionOutputChannel.warn(
-                    WinCCOATestController.LOG_SOURCE,
-                    `Could not find workspace folder for: ${testFile.fileUri.fsPath}`
-                );
-                continue;
-            }
+            let projectFolder: string;
             
-            // Extract project folder (one level above scripts)
-            const projectFolder = this.extractProjectFolder(testFile.fileUri.fsPath, workspaceFolder.uri.fsPath);
+            if (!workspaceFolder) {
+                // In automatic mode, allow tests outside workspace (from WinCC OA project)
+                if (mode === 'automatic') {
+                    // Extract project folder by searching for scripts/ in path
+                    const scriptsIndex = testFile.fileUri.fsPath.indexOf('scripts');
+                    if (scriptsIndex !== -1) {
+                        // Project folder is one level above scripts
+                        projectFolder = path.dirname(testFile.fileUri.fsPath.substring(0, scriptsIndex));
+                        ExtensionOutputChannel.debug(
+                            WinCCOATestController.LOG_SOURCE,
+                            `Test outside workspace (automatic mode): ${path.basename(projectFolder)}`
+                        );
+                    } else {
+                        ExtensionOutputChannel.warn(
+                            WinCCOATestController.LOG_SOURCE,
+                            `Could not determine project folder for: ${testFile.fileUri.fsPath}`
+                        );
+                        continue;
+                    }
+                } else {
+                    // Workspace mode: Skip tests outside workspace
+                    ExtensionOutputChannel.warn(
+                        WinCCOATestController.LOG_SOURCE,
+                        `Could not find workspace folder for: ${testFile.fileUri.fsPath}`
+                    );
+                    continue;
+                }
+            } else {
+                // Extract project folder (one level above scripts)
+                projectFolder = this.extractProjectFolder(testFile.fileUri.fsPath, workspaceFolder.uri.fsPath);
+            }
             
             // Get or create folder map for this project
             if (!projectFolderMap.has(projectFolder)) {

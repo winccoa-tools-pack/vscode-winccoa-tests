@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-01-02
+
+### Added
+- **Configurable Timeout**: New setting `winccoaTests.testExecutionTimeout` (default: 60000ms) replaces hardcoded 5-second timeout
+- Allows tests to run longer without premature timeout failures
+
+### Fixed
+- **Error Handling**: Test runner now logs errors when test execution fails (exit code != 0)
+- Clearer error messages directing users to Script Actions output channel for execution errors
+
 ## [1.0.4] - 2026-01-02
 
 ### Fixed

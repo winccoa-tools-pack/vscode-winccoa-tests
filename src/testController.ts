@@ -599,8 +599,8 @@ export class WinCCOATestController {
 
             // Step 3: Execute the test file via Script Actions
             // If individual test AND file supports it, use executeScriptWithArgs
-            // Otherwise use normal executeScript (runs whole file)
-            let executionStarted: boolean;
+            // Otherwise use normal executeTestFile (runs whole file)
+            let exitCode: number | null;
             
             if (isIndividualTest && supportsIndividualTests) {
                 // Execute single test with arguments
@@ -608,7 +608,7 @@ export class WinCCOATestController {
                     WinCCOATestController.LOG_SOURCE,
                     `Executing individual test with args: ${testCaseIds[0]}`
                 );
-                executionStarted = await TestRunner.executeScriptWithArgs(test.uri, testCaseIds[0], token);
+                exitCode = await TestRunner.executeScriptWithArgs(test.uri, testCaseIds[0], token);
             } else {
                 // Execute entire file (class with all tests)
                 if (isIndividualTest && !supportsIndividualTests) {
@@ -617,19 +617,35 @@ export class WinCCOATestController {
                         'Individual test selected but file does not support it - running entire file instead'
                     );
                 }
-                executionStarted = await TestRunner.executeTestFile(test.uri, token);
+                exitCode = await TestRunner.executeTestFile(test.uri, token);
             }
 
-            if (!executionStarted) {
+            // Check if execution failed (non-zero exit code or internal error)
+            if (exitCode !== 0) {
                 JsonResultParser.deleteResultFiles(mainProjectRoot);
-                const message = new vscode.TestMessage('Failed to start test execution. Is WinCC OA Script Actions extension installed?');
+                
+                let errorMessage = 'Test execution failed';
+                if (exitCode === null) {
+                    errorMessage = 'Test execution was cancelled';
+                } else if (exitCode === -1) {
+                    errorMessage = 'Failed to start test execution. Is WinCC OA Script Actions extension installed?';
+                } else {
+                    errorMessage = `Test execution failed with exit code ${exitCode}. Check WinCC OA Script Actions output for errors (syntax errors, missing functions, runtime errors, etc.)`;
+                }
+                
+                const message = new vscode.TestMessage(errorMessage);
                 run.failed(test, message);
                 return;
             }
 
-            // Step 4: Wait a bit for test execution to complete and write results
-            ExtensionOutputChannel.info(WinCCOATestController.LOG_SOURCE, 'Waiting for test execution to complete...');
-            const resultsAvailable = await this.waitForTestCompletion(mainProjectRoot, 5000, token);
+            // Step 4: Wait for test execution to complete and write results
+            const config = vscode.workspace.getConfiguration('winccoaTests');
+            const timeout = config.get<number>('testExecutionTimeout', 60000);
+            ExtensionOutputChannel.info(
+                WinCCOATestController.LOG_SOURCE,
+                `Waiting for test execution to complete (timeout: ${timeout}ms)...`
+            );
+            const resultsAvailable = await this.waitForTestCompletion(mainProjectRoot, timeout, token);
             
             if (!resultsAvailable) {
                 // Timeout or no results - test execution likely failed

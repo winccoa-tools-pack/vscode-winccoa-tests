@@ -19,11 +19,12 @@ export class TestRunner {
      * Execute a test file using Script Actions
      * 
      * @param fileUri URI of the test file to execute
-     * @returns true if execution started successfully
+     * @returns Promise that resolves with exit code when process completes (0 = success, other = error, null = killed)
      */
     private static runningProcess: import('child_process').ChildProcess | null = null;
+    private static processExitResolver: ((code: number | null) => void) | null = null;
 
-    public static async executeTestFile(fileUri: vscode.Uri, cancelToken?: vscode.CancellationToken): Promise<boolean> {
+    public static async executeTestFile(fileUri: vscode.Uri, cancelToken?: vscode.CancellationToken): Promise<number | null> {
         const { spawn } = await import('child_process');
         try {
             if (!this.isScriptActionsAvailable()) {
@@ -40,7 +41,7 @@ export class TestRunner {
                         vscode.commands.executeCommand('workbench.extensions.search', '@id:RichardJanisch.winccoa-script-actions');
                     }
                 });
-                return false;
+                return -1;
             }
 
             ExtensionOutputChannel.info(this.LOG_SOURCE, `Executing test file: ${fileUri.fsPath}`);
@@ -72,7 +73,7 @@ export class TestRunner {
             
             if (!installPath || !projectName) {
                 ExtensionOutputChannel.error(this.LOG_SOURCE, `Missing config: installPath=${installPath}, projectName=${projectName}`);
-                return false;
+                return -1;
             }
             
             const binPath = installPath.replace(/[\/]+$/, '') + '/bin';
@@ -85,6 +86,11 @@ export class TestRunner {
             const child = spawn(fullExecutablePath, args, { stdio: 'ignore' });
             TestRunner.runningProcess = child;
 
+            // Create promise that resolves when process exits
+            const exitPromise = new Promise<number | null>((resolve) => {
+                TestRunner.processExitResolver = resolve;
+            });
+
             // Listen for cancellation
             if (cancelToken) {
                 cancelToken.onCancellationRequested(() => {
@@ -92,20 +98,39 @@ export class TestRunner {
                         TestRunner.runningProcess.kill();
                         ExtensionOutputChannel.info(this.LOG_SOURCE, 'Test process killed due to cancellation');
                         TestRunner.runningProcess = null;
+                        if (TestRunner.processExitResolver) {
+                            TestRunner.processExitResolver(null);
+                            TestRunner.processExitResolver = null;
+                        }
                     }
                 });
             }
 
             child.on('exit', (code) => {
                 TestRunner.runningProcess = null;
-                ExtensionOutputChannel.info(this.LOG_SOURCE, `Test process exited with code ${code}`);
+                if (code !== 0 && code !== null) {
+                    ExtensionOutputChannel.error(
+                        this.LOG_SOURCE,
+                        `Test process exited with error code ${code}. Check WinCC OA Script Actions output for details.`
+                    );
+                } else {
+                    ExtensionOutputChannel.info(this.LOG_SOURCE, `Test process exited with code ${code}`);
+                }
+                
+                // Resolve promise with exit code
+                if (TestRunner.processExitResolver) {
+                    TestRunner.processExitResolver(code);
+                    TestRunner.processExitResolver = null;
+                }
             });
 
             ExtensionOutputChannel.success(
                 this.LOG_SOURCE,
                 `Test execution started successfully (cancelable)`
             );
-            return true;
+            
+            // Wait for process to complete and return exit code
+            return await exitPromise;
 
         } catch (error) {
             ExtensionOutputChannel.error(
@@ -113,7 +138,7 @@ export class TestRunner {
                 `Failed to execute test file: ${fileUri.fsPath}`,
                 error as Error
             );
-            return false;
+            return -1; // Return -1 for internal errors
         }
     }
 
@@ -122,9 +147,9 @@ export class TestRunner {
      * 
      * @param fileUri URI of the test file to execute
      * @param testCaseId ID of the test case to execute
-     * @returns true if execution started successfully
+     * @returns Promise that resolves with exit code when process completes (0 = success, other = error, null = killed)
      */
-    public static async executeScriptWithArgs(fileUri: vscode.Uri, testCaseId: string, cancelToken?: vscode.CancellationToken): Promise<boolean> {
+    public static async executeScriptWithArgs(fileUri: vscode.Uri, testCaseId: string, cancelToken?: vscode.CancellationToken): Promise<number | null> {
         const { spawn } = await import('child_process');
         try {
             if (!this.isScriptActionsAvailable()) {
@@ -141,7 +166,7 @@ export class TestRunner {
                         vscode.commands.executeCommand('workbench.extensions.search', '@id:RichardJanisch.winccoa-script-actions');
                     }
                 });
-                return false;
+                return -1;
             }
 
             ExtensionOutputChannel.info(this.LOG_SOURCE, `Executing test with args: ${fileUri.fsPath} ${testCaseId}`);
@@ -173,7 +198,7 @@ export class TestRunner {
             
             if (!installPath || !projectName) {
                 ExtensionOutputChannel.error(this.LOG_SOURCE, `Missing config: installPath=${installPath}, projectName=${projectName}`);
-                return false;
+                return -1;
             }
             
             const binPath = installPath.replace(/[\/]+$/, '') + '/bin';
@@ -186,6 +211,11 @@ export class TestRunner {
             const child = spawn(fullExecutablePath, args, { stdio: 'ignore' });
             TestRunner.runningProcess = child;
 
+            // Create promise that resolves when process exits
+            const exitPromise = new Promise<number | null>((resolve) => {
+                TestRunner.processExitResolver = resolve;
+            });
+
             // Listen for cancellation
             if (cancelToken) {
                 cancelToken.onCancellationRequested(() => {
@@ -193,20 +223,39 @@ export class TestRunner {
                         TestRunner.runningProcess.kill();
                         ExtensionOutputChannel.info(this.LOG_SOURCE, 'Test process killed due to cancellation');
                         TestRunner.runningProcess = null;
+                        if (TestRunner.processExitResolver) {
+                            TestRunner.processExitResolver(null);
+                            TestRunner.processExitResolver = null;
+                        }
                     }
                 });
             }
 
             child.on('exit', (code) => {
                 TestRunner.runningProcess = null;
-                ExtensionOutputChannel.info(this.LOG_SOURCE, `Test process exited with code ${code}`);
+                if (code !== 0 && code !== null) {
+                    ExtensionOutputChannel.error(
+                        this.LOG_SOURCE,
+                        `Test process exited with error code ${code}. Check WinCC OA Script Actions output for details.`
+                    );
+                } else {
+                    ExtensionOutputChannel.info(this.LOG_SOURCE, `Test process exited with code ${code}`);
+                }
+                
+                // Resolve promise with exit code
+                if (TestRunner.processExitResolver) {
+                    TestRunner.processExitResolver(code);
+                    TestRunner.processExitResolver = null;
+                }
             });
 
             ExtensionOutputChannel.success(
                 this.LOG_SOURCE,
                 `Test execution with args started successfully (cancelable)`
             );
-            return true;
+            
+            // Wait for process to complete and return exit code
+            return await exitPromise;
 
         } catch (error) {
             ExtensionOutputChannel.error(
@@ -214,7 +263,7 @@ export class TestRunner {
                 `Failed to execute test with args: ${fileUri.fsPath}`,
                 error as Error
             );
-            return false;
+            return -1; // Return -1 for internal errors
         }
     }
 

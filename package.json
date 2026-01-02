@@ -3,7 +3,7 @@
   "displayName": "WinCC OA Test Explorer",
   "description": "Test Explorer integration for WinCC OA unit tests in Visual Studio Code",
   "publisher": "RichardJanisch",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "author": "Richard Janisch",
   "license": "MIT",
   "icon": "resources/wincc_oa_tests_icon_512.png",
@@ -100,6 +100,12 @@
             "Detailed debugging information",
             "Very verbose trace information (for troubleshooting)"
           ]
+        },
+        "winccoaTests.testExecutionTimeout": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 5000,
+          "description": "Maximum time (in milliseconds) to wait for test execution to complete and write results. Default: 60000ms (60 seconds)"
         }
       }
     }

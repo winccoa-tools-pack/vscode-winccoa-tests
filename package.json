@@ -12,7 +12,7 @@
     "url": "https://github.com/winccoa-tools-pack/vscode-winccoa-tests"
   },
   "engines": {
-    "vscode": "^1.106.2"
+    "vscode": "^1.106.0"
   },
   "categories": [
     "Testing",

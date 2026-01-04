@@ -50,11 +50,12 @@
       }
     ],
     "menus": {
-      "testing/view/title": [
+      "commandPalette": [
         {
-          "command": "winccoa-tests.refreshTests",
-          "when": "true",
-          "group": "navigation"
+          "command": "winccoa-tests.refreshTests"
+        },
+        {
+          "command": "winccoa-tests.runAllTests"
         }
       ]
     },

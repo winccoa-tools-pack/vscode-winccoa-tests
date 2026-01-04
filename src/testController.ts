@@ -1060,34 +1060,40 @@ export class WinCCOATestController {
      * Remove all test items associated with a specific file
      */
     private removeTestItemsForFile(uri: vscode.Uri): void {
-        const fileId = `file::${uri.fsPath}`;
+        const fileUriString = uri.toString();
         
-        // Find and remove the file item from the tree
+        // Find and remove all test items that belong to this file
         this.testController.items.forEach(projectItem => {
-            this.removeFileItemRecursive(projectItem, fileId);
+            this.removeTestItemsByUri(projectItem, fileUriString);
         });
     }
 
     /**
-     * Recursively search and remove file item from test hierarchy
+     * Recursively search and remove test items that belong to the specified file
      */
-    private removeFileItemRecursive(parent: vscode.TestItem, fileId: string): boolean {
+    private removeTestItemsByUri(parent: vscode.TestItem, fileUriString: string): boolean {
         let found = false;
+        const childrenToRemove: string[] = [];
         
         parent.children.forEach(child => {
-            if (child.id === fileId) {
-                parent.children.delete(child.id);
+            // Check if this item belongs to the deleted file
+            if (child.uri && child.uri.toString() === fileUriString) {
+                childrenToRemove.push(child.id);
                 found = true;
             } else if (child.children.size > 0) {
-                const removedFromChild = this.removeFileItemRecursive(child, fileId);
+                // Recursively check children
+                const removedFromChild = this.removeTestItemsByUri(child, fileUriString);
                 
-                // If child folder is now empty, remove it too
+                // If child folder is now empty, mark it for removal
                 if (removedFromChild && child.children.size === 0 && child.id.startsWith('folder::')) {
-                    parent.children.delete(child.id);
+                    childrenToRemove.push(child.id);
                     found = true;
                 }
             }
         });
+        
+        // Remove all marked children
+        childrenToRemove.forEach(id => parent.children.delete(id));
         
         return found;
     }

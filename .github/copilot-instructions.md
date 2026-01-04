@@ -70,6 +70,27 @@ Ein Bug im File-Watcher-Menü sorgt dafür, dass aktuell alle Einträge verschwi
 ### Known Issues
 **WinCC OA Limitation**: Beim Ausführen einzelner Testfälle generiert WinCC OA aktuell keinen vollständigen Test-Report. Die Infrastruktur in den Extensions ist vorbereitet, aber die volle Funktionalität hängt von zukünftigen WinCC OA Verbesserungen ab.
 
-## Versionsstände (Stand: 2025-12-25)
-- Script Actions: v0.3.1 - executeScriptWithArgs mit plain arguments
-- Test Explorer: v0.2.2 - Single test execution + Performance-Optimierungen
+## Makefile Automation
+
+### Version Badge Auto-Update (seit 2026-01-04)
+Alle Extensions haben automatische Version Badge Updates im `make package` Target:
+
+```makefile
+package: build
+	@-$(MKDIR) $(BIN_DIR) 2>nul || echo "" >nul
+	@node -e "const fs=require('fs'); let c=fs.readFileSync('README.md','utf8'); c=c.replace(/!\\[Version\\]\\(https:\\/\\/img\\.shields\\.io\\/badge\\/version-[^)]*\\)/,'![Version](https://img.shields.io/badge/version-$(VERSION)-blue.svg)'); fs.writeFileSync('README.md',c);"
+	@npx vsce package --out $(BIN_DIR)/$(EXTENSION_NAME)-$(VERSION).vsix
+```
+
+**Cross-platform Lösung:**
+- Node.js statt sed/PowerShell für maximale Kompatibilität
+- Version automatisch aus package.json
+- Keine manuellen README.md Änderungen mehr nötig
+
+## Versionsstände (Stand: 2026-01-04)
+- **Test Explorer**: v0.2.4 - Cancel/Stop + version badge automation
+- **Script Actions**: v0.4.0 - Default commands + version badge automation
+- **LogViewer**: v1.0.3 - Backend file watching + version badge automation
+- **CTL Language**: v1.2.0 - Scope-aware rename + keywords + version badge automation
+- **Project Admin**: Latest - Version badge automation
+- **Core Extension**: v0.2.3 - PMON start/stop sequence fix

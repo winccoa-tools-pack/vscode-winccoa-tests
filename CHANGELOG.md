@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-01-04
+
+### Fixed
+- **File Deletion**: Tests are now properly removed from Test Explorer when their source files are deleted
+- **Test Case Deletion**: Individual test cases are correctly removed when deleted from a file (via file change detection)
+- Root cause: `removeTestItemsForFile` was searching for non-existent `file::` ID items instead of matching by URI
+
 ## [1.0.5] - 2026-01-02
 
 ### Added

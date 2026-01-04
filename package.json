@@ -3,7 +3,7 @@
   "displayName": "WinCC OA Test Explorer",
   "description": "Test Explorer integration for WinCC OA unit tests in Visual Studio Code",
   "publisher": "RichardJanisch",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "author": "Richard Janisch",
   "license": "MIT",
   "icon": "resources/wincc_oa_tests_icon_512.png",
@@ -12,7 +12,7 @@
     "url": "https://github.com/winccoa-tools-pack/vscode-winccoa-tests"
   },
   "engines": {
-    "vscode": "^1.106.2"
+    "vscode": "^1.106.0"
   },
   "categories": [
     "Testing",
@@ -50,11 +50,12 @@
       }
     ],
     "menus": {
-      "testing/view/title": [
+      "commandPalette": [
         {
-          "command": "winccoa-tests.refreshTests",
-          "when": "true",
-          "group": "navigation"
+          "command": "winccoa-tests.refreshTests"
+        },
+        {
+          "command": "winccoa-tests.runAllTests"
         }
       ]
     },

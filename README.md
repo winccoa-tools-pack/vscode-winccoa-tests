@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.6-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![VS Code](https://img.shields.io/badge/VS%20Code-^1.106.2-007ACC.svg)
 
@@ -14,8 +14,8 @@
 
 ---
 
-> **Disclaimer:**
-> This is the first stable release (v1.0.3) of the WinCC OA Test Explorer extension. Not all features are fully implemented and some functions may not work perfectly yet. Please report any issues you encounter.
+> **Disclaimer:** This is one of the first releases of the WinCC OA Test Explorer extension. Some edge cases may not be fully covered yet. Please check the [Known Issues](#-known-issues) section for workarounds if you encounter problems.  
+> **Tip:** If the extension doesn't work as expected, try `Ctrl+Shift+P` → `Reload Window` to refresh.
 
 ---
 
@@ -195,6 +195,22 @@ main()
 ---
 
 ## 🐛 Known Issues
+
+### Performance
+
+**Windows Performance:**  
+The extension may run slower on Windows with longer loading times. Linux performs significantly better.
+
+**Large Projects:**  
+Very large projects (1000+ test files) may experience performance issues during discovery.
+
+### General
+
+**Extension Not Responding:**  
+If the extension doesn't work as expected (tests not refreshing, detection issues), reload VS Code:  
+1. Press `Ctrl+Shift+P`
+2. Type and select `Reload Window`
+3. For test refresh: Run `WinCC OA Tests: Refresh Tests` from Command Palette
 
 ### Current Limitations
 

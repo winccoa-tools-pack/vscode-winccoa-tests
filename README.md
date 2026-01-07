@@ -159,7 +159,6 @@ main()
 - Click-to-navigate for all test states (passed, failed, aborted)
 - Accurate error locations with StackTrace parsing
 - Individual test messages per assertion
-- Fast execution with `-n` flag (no event connection)
 
 ### 📊 Test Results
 - Visual test status indicators in Test Explorer sidebar

@@ -35,7 +35,7 @@ jobs:
                 branch: 'main',
                 required_status_checks: {
                   strict: true,
-                  contexts: ['test (18.x)', 'test (20.x)', 'package']
+                  contexts: ['test (20.x)', 'package']
                 },
                 enforce_admins: false,
                 required_pull_request_reviews: {
@@ -69,7 +69,7 @@ jobs:
                 branch: 'develop',
                 required_status_checks: {
                   strict: true,
-                  contexts: ['test (18.x)', 'test (20.x)', 'package']
+                  contexts: ['test (20.x)', 'package']
                 },
                 enforce_admins: false,
                 required_pull_request_reviews: {

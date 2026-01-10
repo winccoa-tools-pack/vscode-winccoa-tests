@@ -8,7 +8,7 @@
 
 **Test Explorer integration for WinCC OA unit tests in Visual Studio Code**
 
-[Features](#-features) • [Installation](#-installation) • [Known Issues](#-known-issues)
+[Features](#-features) • [Known Issues](#-known-issues)
 
 </div>
 
@@ -28,6 +28,7 @@
 ## ✨ Features
 
 ### 🔍 Test Discovery
+
 - Automatic discovery of WinCC OA test files in workspace
 - Support for both WinCC OA 3.19 and 3.20 test formats
 - Auto-refresh on file changes with incremental updates
@@ -36,6 +37,7 @@
 #### Supported Test Patterns
 
 **WinCC OA 3.19 Format:**
+
 ```c
 // $License: NOLICENSE
 /** Tests for the library: scripts/libs/$origLibRelPath.
@@ -95,6 +97,7 @@ main()
 ```
 
 **WinCC OA 3.20 Format:**
+
 ```cpp
 // $License: NOLICENSE
 /** Tests for the library: scripts/libs/$origLibRelPath.
@@ -154,6 +157,7 @@ main()
 ```
 
 ### 🚀 Test Execution
+
 - Run individual test files or entire folders
 - **Test Cancellation**: Stop running tests via stop button
 - Click-to-navigate for all test states (passed, failed, aborted)
@@ -162,12 +166,14 @@ main()
 - Fast execution with `-n` flag (no event connection)
 
 ### 📊 Test Results
+
 - Visual test status indicators in Test Explorer sidebar
 - Detailed error messages with file and line references
 - Test duration tracking
 - Structured logging with configurable log levels
 
 ### 🎨 IDE Integration
+
 - Native VS Code Test Explorer UI
 - Recursive folder execution
 - Multi-workspace support
@@ -208,6 +214,7 @@ Very large projects (1000+ test files) may experience performance issues during 
 
 **Extension Not Responding:**  
 If the extension doesn't work as expected (tests not refreshing, detection issues), reload VS Code:  
+
 1. Press `Ctrl+Shift+P`
 2. Type and select `Reload Window`
 3. For test refresh: Run `WinCC OA Tests: Refresh Tests` from Command Palette
@@ -230,6 +237,7 @@ If the extension doesn't work as expected (tests not refreshing, detection issue
 ### Reporting Bugs
 
 Found an issue? Please report it with:
+
 - WinCC OA version
 - Extension version (`1.0.0`)
 - Test file example that reproduces the issue
@@ -280,4 +288,3 @@ Made with ❤️ for the WinCC OA community
 [GitHub](https://github.com/winccoa-tools-pack/vscode-winccoa-tests) • [Issues](https://github.com/winccoa-tools-pack/vscode-winccoa-tests/issues) • [WinCC OA Docs](https://www.winccoa.com)
 
 </div>
-

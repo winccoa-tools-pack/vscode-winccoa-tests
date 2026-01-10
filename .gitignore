@@ -1,8 +1,10 @@
+
 # Dependencies
 node_modules/
 
 # Build output
 dist/
+dist-esm/
 out/
 bin/
 !bin/*.vsix
@@ -32,6 +34,11 @@ coverage/
 # Temporary files
 *.tmp
 .cache/
-*.bak
-*.vsix
 DevEnv.code-workspace
+
+# TypeScript build info
+**/*.tsbuildinfo
+
+# Optional extras
+*.tgz
+.env

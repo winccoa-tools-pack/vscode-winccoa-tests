@@ -1,13 +1,11 @@
 export function log(message: string): void {
-  console.log(`[core-utils] ${message}`);
+    console.log(`[core-utils] ${message}`);
 }
 
 export function validateConfig(config: unknown): boolean {
-  return typeof config === 'object' && config !== null;
+    return typeof config === 'object' && config !== null;
 }
 
-export async function getExtensions(): Promise<Array<{name: string; description?: string}>> {
-  return [
-    { name: 'winccoa-tools-pack/core-utils', description: 'Shared utilities' }
-  ];
+export async function getExtensions(): Promise<Array<{ name: string; description?: string }>> {
+    return [{ name: 'winccoa-tools-pack/core-utils', description: 'Shared utilities' }];
 }

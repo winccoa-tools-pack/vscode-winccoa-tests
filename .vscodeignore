@@ -1,16 +1,28 @@
-*.vsix
-node_modules/
-.vscode-test/
-out/
-bin/
-*.bak
-*.log
-.DS_Store
+
+# VS Code settings and tests
+.vscode/**
+.vscode-test/**
+
+# Git and CI
 .gitignore
 .gitattributes
-tsconfig.json
+.gitflow
+.github/**
+
+# Build artifacts
+*.vsix
+*.map
 Makefile
-src/
-test-samples/
-!images/**/*.gif
-!resources/**/*.gif
+.markdownlint.json
+
+# Source and configs
+src/**
+tsconfig.json
+tsconfig.tsbuildinfo
+
+# Node modules (safe because we bundle)
+node_modules/**
+
+# Exceptions for assets
+!resources/**
+!images/**

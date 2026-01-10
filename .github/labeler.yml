@@ -1,18 +1,19 @@
-# PR labeler configuration (actions/labeler v6)
-# Adjust patterns to match your repository structure
+
+# .github/labeler.yml  — actions/labeler v6 schema
+
 frontend:
-  - paths:
-      - 'src/**'
+  - changed-files:
+      - any-glob-to-any-file: 'src/**'
 
 ci:
-  - paths:
-      - '.github/workflows/**'
+  - changed-files:
+      - any-glob-to-any-file: '.github/workflows/**'
 
 docs:
-  - paths:
-      - 'README.md'
-      - 'docs/**'
+  - changed-files:
+      - any-glob-to-any-file: 'README.md'
+      - any-glob-to-any-file: 'docs/**'
 
 tests:
-  - paths:
-      - 'test/**'
+  - changed-files:
+      - any-glob-to-any-file: 'test/**'

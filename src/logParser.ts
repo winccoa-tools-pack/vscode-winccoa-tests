@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as readline from 'readline';
-import { ExtensionOutputChannel } from './extensionOutput';
+import { ExtensionOutputChannel } from './extensionOutput.js';
 
 /**
  * Stack trace location
@@ -33,10 +33,11 @@ export class LogParser {
     // Regex patterns for test results
     private static readonly TEST_PASSED_PATTERN = /\(OK\) Testcase '([^']+)' passed/;
     private static readonly TEST_FAILED_PATTERN = /\(FAILED\) Testcase '([^']+)' failed/;
-    private static readonly TIMESTAMP_PATTERN = /^WCCOActrl.*?(\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}\.\d{3})/;
+    private static readonly TIMESTAMP_PATTERN =
+        /^WCCOActrl.*?(\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}\.\d{3})/;
     // Pattern to match stack trace: "\t<function> at <filepath>:<line>"
     private static readonly STACKTRACE_PATTERN = /^\t(.+?)\s+at\s+(.+?):(\d+)/;
-    
+
     // Store last file position to avoid re-parsing entire file
     private static lastFilePosition: number = 0;
 
@@ -50,12 +51,15 @@ export class LogParser {
     public static async parseLogFile(
         logPath: string,
         testCaseIds: string[],
-        fromPosition: number = 0
+        fromPosition: number = 0,
     ): Promise<Map<string, TestResult>> {
         const results = new Map<string, TestResult>();
 
         try {
-            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Parsing log file from position ${fromPosition}: ${logPath}`);
+            ExtensionOutputChannel.debug(
+                this.LOG_SOURCE,
+                `Parsing log file from position ${fromPosition}: ${logPath}`,
+            );
 
             // Get file stats to determine file size
             const stats = fs.statSync(logPath);
@@ -63,7 +67,10 @@ export class LogParser {
 
             // If fromPosition is beyond file size, reset to beginning
             if (fromPosition >= fileSize) {
-                ExtensionOutputChannel.debug(this.LOG_SOURCE, `File position ${fromPosition} >= file size ${fileSize}, resetting to 0`);
+                ExtensionOutputChannel.debug(
+                    this.LOG_SOURCE,
+                    `File position ${fromPosition} >= file size ${fileSize}, resetting to 0`,
+                );
                 fromPosition = 0;
             }
 
@@ -71,7 +78,7 @@ export class LogParser {
             const fileStream = fs.createReadStream(logPath, { start: fromPosition });
             const rl = readline.createInterface({
                 input: fileStream,
-                crlfDelay: Infinity
+                crlfDelay: Infinity,
             });
 
             let currentTimestamp: string | undefined;
@@ -96,9 +103,12 @@ export class LogParser {
                         results.set(testCaseId, {
                             testCaseId,
                             status: 'passed',
-                            timestamp: currentTimestamp
+                            timestamp: currentTimestamp,
                         });
-                        ExtensionOutputChannel.debug(this.LOG_SOURCE, `Found PASSED: ${testCaseId}`);
+                        ExtensionOutputChannel.debug(
+                            this.LOG_SOURCE,
+                            `Found PASSED: ${testCaseId}`,
+                        );
                     }
                     // Stop collecting stack trace if this test passed
                     if (collectingStackTrace && currentTestCaseId === testCaseId) {
@@ -125,10 +135,13 @@ export class LogParser {
                             status: 'failed',
                             message,
                             timestamp: currentTimestamp,
-                            fullStackTrace: []
+                            fullStackTrace: [],
                         });
-                        ExtensionOutputChannel.debug(this.LOG_SOURCE, `Found FAILED: ${testCaseId} - ${message}`);
-                        
+                        ExtensionOutputChannel.debug(
+                            this.LOG_SOURCE,
+                            `Found FAILED: ${testCaseId} - ${message}`,
+                        );
+
                         // Start collecting stack trace for this failed test
                         currentTestCaseId = testCaseId;
                         collectingStackTrace = true;
@@ -165,7 +178,7 @@ export class LogParser {
 
                         ExtensionOutputChannel.debug(
                             this.LOG_SOURCE,
-                            `Found stack trace: ${functionName} at ${filePath}:${lineNumber}`
+                            `Found stack trace: ${functionName} at ${filePath}:${lineNumber}`,
                         );
 
                         const result = results.get(currentTestCaseId);
@@ -179,7 +192,7 @@ export class LogParser {
                             result.fullStackTrace.push({
                                 functionName,
                                 filePath,
-                                line: lineNumber
+                                line: lineNumber,
                             });
 
                             // Set the first one as the primary stack trace (failure location)
@@ -187,11 +200,11 @@ export class LogParser {
                                 result.stackTrace = {
                                     functionName,
                                     filePath,
-                                    line: lineNumber
+                                    line: lineNumber,
                                 };
                                 ExtensionOutputChannel.success(
                                     this.LOG_SOURCE,
-                                    `Added stack trace for ${currentTestCaseId}: ${filePath}:${lineNumber}`
+                                    `Added stack trace for ${currentTestCaseId}: ${filePath}:${lineNumber}`,
                                 );
                             }
 
@@ -200,7 +213,11 @@ export class LogParser {
                                 result.note = currentNote;
                             }
                         }
-                    } else if (line.trim() !== '' && !line.startsWith('\t') && !line.startsWith('  ')) {
+                    } else if (
+                        line.trim() !== '' &&
+                        !line.startsWith('\t') &&
+                        !line.startsWith('  ')
+                    ) {
                         // End of stack trace section (non-indented line)
                         collectingStackTrace = false;
                         collectingNote = false;
@@ -215,14 +232,13 @@ export class LogParser {
 
             ExtensionOutputChannel.info(
                 this.LOG_SOURCE,
-                `Parsed ${results.size} test result(s) from log file (read from ${fromPosition} to ${fileSize})`
+                `Parsed ${results.size} test result(s) from log file (read from ${fromPosition} to ${fileSize})`,
             );
-
         } catch (error) {
             ExtensionOutputChannel.error(
                 this.LOG_SOURCE,
                 `Failed to parse log file: ${logPath}`,
-                error as Error
+                error as Error,
             );
         }
 
@@ -232,7 +248,7 @@ export class LogParser {
     /**
      * Wait for test results to appear in log file
      * Polls the log file for a specified duration
-     * 
+     *
      * @param logPath Path to the log file
      * @param testCaseIds List of test case IDs to look for
      * @param timeoutMs Maximum time to wait in milliseconds
@@ -243,14 +259,14 @@ export class LogParser {
         logPath: string,
         testCaseIds: string[],
         timeoutMs: number = 10000,
-        pollIntervalMs: number = 500
+        pollIntervalMs: number = 500,
     ): Promise<Map<string, TestResult>> {
         const startTime = Date.now();
         const expectedCount = testCaseIds.length;
 
         ExtensionOutputChannel.debug(
             this.LOG_SOURCE,
-            `Waiting for ${expectedCount} test result(s) in log file (timeout: ${timeoutMs}ms)`
+            `Waiting for ${expectedCount} test result(s) in log file (timeout: ${timeoutMs}ms)`,
         );
 
         // Get initial file size to start reading from
@@ -258,9 +274,15 @@ export class LogParser {
         try {
             const stats = fs.statSync(logPath);
             initialSize = stats.size;
-            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Initial log file size: ${initialSize} bytes`);
+            ExtensionOutputChannel.debug(
+                this.LOG_SOURCE,
+                `Initial log file size: ${initialSize} bytes`,
+            );
         } catch (error) {
-            ExtensionOutputChannel.warn(this.LOG_SOURCE, `Could not get initial file size: ${error}`);
+            ExtensionOutputChannel.warn(
+                this.LOG_SOURCE,
+                `Could not get initial file size: ${error}`,
+            );
         }
 
         // Store the starting position
@@ -274,20 +296,20 @@ export class LogParser {
             if (results.size === expectedCount) {
                 ExtensionOutputChannel.success(
                     this.LOG_SOURCE,
-                    `All ${expectedCount} test result(s) found`
+                    `All ${expectedCount} test result(s) found`,
                 );
                 return results;
             }
 
             // Wait before next poll
-            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+            await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
         }
 
         // Timeout - return whatever we found
         const results = await this.parseLogFile(logPath, testCaseIds, startPosition);
         ExtensionOutputChannel.warn(
             this.LOG_SOURCE,
-            `Timeout waiting for test results. Found ${results.size}/${expectedCount} result(s)`
+            `Timeout waiting for test results. Found ${results.size}/${expectedCount} result(s)`,
         );
 
         return results;

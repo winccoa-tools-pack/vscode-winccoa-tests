@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { ExtensionOutputChannel } from './extensionOutput';
-import { TestParser, ParsedTestFile } from './testParser';
+import { ExtensionOutputChannel } from './extensionOutput.js';
+import { TestParser, ParsedTestFile } from './testParser.js';
 
 export type TestDiscoveryMode = 'automatic' | 'workspace';
 
@@ -32,7 +32,7 @@ export class TestDiscovery {
      */
     public static async discoverTests(): Promise<ParsedTestFile[]> {
         const mode = this.getDiscoveryMode();
-        
+
         ExtensionOutputChannel.info(this.LOG_SOURCE, `Using discovery mode: ${mode}`);
 
         switch (mode) {
@@ -41,7 +41,10 @@ export class TestDiscovery {
             case 'workspace':
                 return await this.discoverWorkspace();
             default:
-                ExtensionOutputChannel.warn(this.LOG_SOURCE, `Unknown discovery mode: ${mode}, falling back to workspace`);
+                ExtensionOutputChannel.warn(
+                    this.LOG_SOURCE,
+                    `Unknown discovery mode: ${mode}, falling back to workspace`,
+                );
                 return await this.discoverWorkspace();
         }
     }
@@ -50,15 +53,20 @@ export class TestDiscovery {
      * Automatic mode: Use tests from currently selected project (WinCC OA Core)
      */
     private static async discoverAutomatic(): Promise<ParsedTestFile[]> {
-        ExtensionOutputChannel.info(this.LOG_SOURCE, 'Automatic mode - using current project from WinCC OA Core extension');
-        
+        ExtensionOutputChannel.info(
+            this.LOG_SOURCE,
+            'Automatic mode - using current project from WinCC OA Core extension',
+        );
+
         // Try to get Core extension
-        const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-project-admin');
-        
+        const coreExtension = vscode.extensions.getExtension(
+            'RichardJanisch.winccoa-project-admin',
+        );
+
         if (!coreExtension) {
             ExtensionOutputChannel.warn(
                 this.LOG_SOURCE,
-                'WinCC OA Core extension not found - falling back to workspace mode'
+                'WinCC OA Core extension not found - falling back to workspace mode',
             );
             return await this.discoverWorkspace();
         }
@@ -73,44 +81,47 @@ export class TestDiscovery {
                 ExtensionOutputChannel.error(
                     this.LOG_SOURCE,
                     `Failed to activate Core extension: ${err.message}`,
-                    err
+                    err,
                 );
                 return await this.discoverWorkspace();
             }
         }
 
         const coreApi = coreExtension.exports;
-        
+
         if (!coreApi || !coreApi.getCurrentProject) {
             ExtensionOutputChannel.warn(
                 this.LOG_SOURCE,
-                'Core extension API not available - falling back to workspace mode'
+                'Core extension API not available - falling back to workspace mode',
             );
             return await this.discoverWorkspace();
         }
 
         const currentProject = coreApi.getCurrentProject();
-        
+
         if (!currentProject || !currentProject.projectDir) {
             ExtensionOutputChannel.info(
                 this.LOG_SOURCE,
-                'No project currently selected in Core extension - falling back to workspace mode'
+                'No project currently selected in Core extension - falling back to workspace mode',
             );
             return await this.discoverWorkspace();
         }
 
         ExtensionOutputChannel.success(
             this.LOG_SOURCE,
-            `Using project from Core extension: ${currentProject.name || 'Unknown'}`
+            `Using project from Core extension: ${currentProject.name || 'Unknown'}`,
         );
-        ExtensionOutputChannel.debug(this.LOG_SOURCE, `  Project directory: ${currentProject.projectDir}`);
+        ExtensionOutputChannel.debug(
+            this.LOG_SOURCE,
+            `  Project directory: ${currentProject.projectDir}`,
+        );
 
         // Get project path and check for subprojects in config
         const projectPath = currentProject.projectDir;
         const configPath = currentProject.configPath;
-        
+
         const projectsToSearch: string[] = [projectPath];
-        
+
         // Parse subprojects from config if available
         if (configPath) {
             try {
@@ -118,7 +129,7 @@ export class TestDiscovery {
                 if (subProjects.length > 0) {
                     ExtensionOutputChannel.info(
                         this.LOG_SOURCE,
-                        `Found ${subProjects.length} subproject(s) in config`
+                        `Found ${subProjects.length} subproject(s) in config`,
                     );
                     projectsToSearch.push(...subProjects);
                 }
@@ -126,14 +137,14 @@ export class TestDiscovery {
                 const err = error as Error;
                 ExtensionOutputChannel.warn(
                     this.LOG_SOURCE,
-                    `Failed to parse subprojects from config: ${err.message}`
+                    `Failed to parse subprojects from config: ${err.message}`,
                 );
             }
         }
 
         ExtensionOutputChannel.info(
             this.LOG_SOURCE,
-            `Searching for tests in ${projectsToSearch.length} project(s)`
+            `Searching for tests in ${projectsToSearch.length} project(s)`,
         );
 
         const testFiles: ParsedTestFile[] = [];
@@ -148,43 +159,40 @@ export class TestDiscovery {
             } catch {
                 ExtensionOutputChannel.trace(
                     this.LOG_SOURCE,
-                    `No scripts folder in: ${projectDir}`
+                    `No scripts folder in: ${projectDir}`,
                 );
                 continue;
             }
 
-            ExtensionOutputChannel.debug(
-                this.LOG_SOURCE,
-                `Searching in: ${scriptsPath}`
-            );
+            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Searching in: ${scriptsPath}`);
 
             // Use glob to find all .ctl files in scripts folder (recursive)
             const pattern = new vscode.RelativePattern(scriptsPath, '**/*.ctl');
             const files = await vscode.workspace.findFiles(pattern, '**/node_modules/**');
 
-            ExtensionOutputChannel.trace(
-                this.LOG_SOURCE,
-                `  Found ${files.length} .ctl file(s)`
-            );
+            ExtensionOutputChannel.trace(this.LOG_SOURCE, `  Found ${files.length} .ctl file(s)`);
 
             for (const fileUri of files) {
                 try {
                     // Quick check if file contains OaTest
                     const containsOaTest = await TestParser.containsOaTest(fileUri);
-                    
+
                     if (!containsOaTest) {
-                        ExtensionOutputChannel.trace(this.LOG_SOURCE, `    Skipping (no OaTest): ${path.basename(fileUri.fsPath)}`);
+                        ExtensionOutputChannel.trace(
+                            this.LOG_SOURCE,
+                            `    Skipping (no OaTest): ${path.basename(fileUri.fsPath)}`,
+                        );
                         continue;
                     }
 
                     // Parse the file
                     const parsedFile = await TestParser.parseFile(fileUri);
-                    
+
                     if (parsedFile && parsedFile.testClasses.length > 0) {
                         testFiles.push(parsedFile);
                         ExtensionOutputChannel.trace(
                             this.LOG_SOURCE,
-                            `    ✓ ${path.relative(scriptsPath, fileUri.fsPath)}: ${parsedFile.testClasses.length} test class(es)`
+                            `    ✓ ${path.relative(scriptsPath, fileUri.fsPath)}: ${parsedFile.testClasses.length} test class(es)`,
                         );
                     }
                 } catch (error) {
@@ -192,7 +200,7 @@ export class TestDiscovery {
                     ExtensionOutputChannel.error(
                         this.LOG_SOURCE,
                         `Error parsing ${fileUri.fsPath}: ${err.message}`,
-                        err
+                        err,
                     );
                 }
             }
@@ -200,7 +208,7 @@ export class TestDiscovery {
 
         ExtensionOutputChannel.success(
             this.LOG_SOURCE,
-            `Automatic mode complete: Found ${testFiles.length} test file(s) with ${testFiles.reduce((sum, f) => sum + f.testClasses.length, 0)} test class(es)`
+            `Automatic mode complete: Found ${testFiles.length} test file(s) with ${testFiles.reduce((sum, f) => sum + f.testClasses.length, 0)} test class(es)`,
         );
 
         return testFiles;
@@ -210,7 +218,10 @@ export class TestDiscovery {
      * Parse subprojects from config file
      * Based on ProjectPathResolver from winccoa-ctrllang extension
      */
-    private static async parseSubProjectsFromConfig(configPath: string, mainProjectPath: string): Promise<string[]> {
+    private static async parseSubProjectsFromConfig(
+        configPath: string,
+        mainProjectPath: string,
+    ): Promise<string[]> {
         const subProjects: string[] = [];
 
         try {
@@ -220,25 +231,25 @@ export class TestDiscovery {
 
             for (const line of lines) {
                 const trimmedLine = line.trim();
-                
+
                 // Look for "proj_path" entries (can be absolute or relative)
                 // Example: proj_path = "../SubProject1"
                 // Example: proj_path = "/absolute/path/SubProject2"
                 const projPathMatch = trimmedLine.match(/^proj_path\s*=\s*"([^"]+)"/);
-                
+
                 if (projPathMatch) {
                     let subProjectPath = projPathMatch[1];
-                    
+
                     // Resolve relative paths relative to main project directory
                     if (!path.isAbsolute(subProjectPath)) {
                         subProjectPath = path.resolve(mainProjectPath, subProjectPath);
                     }
-                    
+
                     // Normalize and add to list
                     subProjects.push(path.normalize(subProjectPath));
                     ExtensionOutputChannel.trace(
                         this.LOG_SOURCE,
-                        `    Found subproject: ${subProjectPath}`
+                        `    Found subproject: ${subProjectPath}`,
                     );
                 }
             }
@@ -247,7 +258,7 @@ export class TestDiscovery {
             ExtensionOutputChannel.error(
                 this.LOG_SOURCE,
                 `Error reading config file ${configPath}: ${err.message}`,
-                err
+                err,
             );
         }
 
@@ -259,7 +270,7 @@ export class TestDiscovery {
      */
     private static async discoverWorkspace(): Promise<ParsedTestFile[]> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
-        
+
         if (!workspaceFolders || workspaceFolders.length === 0) {
             ExtensionOutputChannel.warn(this.LOG_SOURCE, 'No workspace folders found');
             return [];
@@ -270,15 +281,15 @@ export class TestDiscovery {
 
         // Filter to configured folders if specified
         if (configuredFolders.length > 0) {
-            foldersToSearch = workspaceFolders.filter(f => configuredFolders.includes(f.name));
+            foldersToSearch = workspaceFolders.filter((f) => configuredFolders.includes(f.name));
             ExtensionOutputChannel.info(
-                this.LOG_SOURCE, 
-                `Searching in configured folders: ${foldersToSearch.map(f => f.name).join(', ')}`
+                this.LOG_SOURCE,
+                `Searching in configured folders: ${foldersToSearch.map((f) => f.name).join(', ')}`,
             );
         } else {
             ExtensionOutputChannel.info(
                 this.LOG_SOURCE,
-                `Searching in all workspace folders: ${foldersToSearch.map(f => f.name).join(', ')}`
+                `Searching in all workspace folders: ${foldersToSearch.map((f) => f.name).join(', ')}`,
             );
         }
 
@@ -291,8 +302,8 @@ export class TestDiscovery {
         }
 
         ExtensionOutputChannel.success(
-            this.LOG_SOURCE, 
-            `Discovery complete: Found ${allTestFiles.length} test file(s) with ${allTestFiles.reduce((sum, f) => sum + f.testClasses.length, 0)} test class(es)`
+            this.LOG_SOURCE,
+            `Discovery complete: Found ${allTestFiles.length} test file(s) with ${allTestFiles.reduce((sum, f) => sum + f.testClasses.length, 0)} test class(es)`,
         );
 
         return allTestFiles;
@@ -302,49 +313,64 @@ export class TestDiscovery {
      * Discover tests in a single workspace folder
      * Improved to find scripts folders at any depth, not just directly under workspace root
      */
-    private static async discoverInFolder(folder: vscode.WorkspaceFolder): Promise<ParsedTestFile[]> {
+    private static async discoverInFolder(
+        folder: vscode.WorkspaceFolder,
+    ): Promise<ParsedTestFile[]> {
         const testFiles: ParsedTestFile[] = [];
         const folderPath = folder.uri.fsPath;
 
-        ExtensionOutputChannel.debug(this.LOG_SOURCE, `Searching in workspace folder: ${folderPath}`);
+        ExtensionOutputChannel.debug(
+            this.LOG_SOURCE,
+            `Searching in workspace folder: ${folderPath}`,
+        );
 
         try {
             // Improved strategy: Search for scripts/ folders at any depth
             // Pattern: **/scripts/**/*.ctl finds scripts folders anywhere in the tree
             const scriptsPattern = new vscode.RelativePattern(folder, '**/scripts/**/*.ctl');
-            
+
             ExtensionOutputChannel.trace(this.LOG_SOURCE, `Using pattern: **/scripts/**/*.ctl`);
 
             const ctlFiles = await vscode.workspace.findFiles(
                 scriptsPattern,
-                '**/node_modules/**' // Exclude node_modules
+                '**/node_modules/**', // Exclude node_modules
             );
 
-            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Found ${ctlFiles.length} .ctl file(s) in scripts folders`);
+            ExtensionOutputChannel.debug(
+                this.LOG_SOURCE,
+                `Found ${ctlFiles.length} .ctl file(s) in scripts folders`,
+            );
 
             // Parse each file
             for (const fileUri of ctlFiles) {
                 // Quick check if file contains OaTest
                 const containsOaTest = await TestParser.containsOaTest(fileUri);
-                
+
                 if (!containsOaTest) {
-                    ExtensionOutputChannel.trace(this.LOG_SOURCE, `Skipping (no OaTest): ${fileUri.fsPath}`);
+                    ExtensionOutputChannel.trace(
+                        this.LOG_SOURCE,
+                        `Skipping (no OaTest): ${fileUri.fsPath}`,
+                    );
                     continue;
                 }
 
                 // Parse the file
                 const parsedFile = await TestParser.parseFile(fileUri);
-                
+
                 if (parsedFile && parsedFile.testClasses.length > 0) {
                     testFiles.push(parsedFile);
                     ExtensionOutputChannel.debug(
                         this.LOG_SOURCE,
-                        `Added test file: ${path.basename(fileUri.fsPath)} (${parsedFile.testClasses.length} class(es))`
+                        `Added test file: ${path.basename(fileUri.fsPath)} (${parsedFile.testClasses.length} class(es))`,
                     );
                 }
             }
         } catch (error) {
-            ExtensionOutputChannel.error(this.LOG_SOURCE, `Error discovering tests in folder: ${folderPath}`, error as Error);
+            ExtensionOutputChannel.error(
+                this.LOG_SOURCE,
+                `Error discovering tests in folder: ${folderPath}`,
+                error as Error,
+            );
         }
 
         return testFiles;
@@ -355,11 +381,17 @@ export class TestDiscovery {
      * Useful for incremental updates when a file changes
      */
     public static async parseTestFile(fileUri: vscode.Uri): Promise<ParsedTestFile | undefined> {
-        ExtensionOutputChannel.debug(this.LOG_SOURCE, `Parsing single test file: ${fileUri.fsPath}`);
+        ExtensionOutputChannel.debug(
+            this.LOG_SOURCE,
+            `Parsing single test file: ${fileUri.fsPath}`,
+        );
 
         // Check if file is in a scripts folder
         if (!fileUri.fsPath.includes('/scripts/') && !fileUri.fsPath.includes('\\scripts\\')) {
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, `File not in scripts folder, skipping: ${fileUri.fsPath}`);
+            ExtensionOutputChannel.trace(
+                this.LOG_SOURCE,
+                `File not in scripts folder, skipping: ${fileUri.fsPath}`,
+            );
             return undefined;
         }
 

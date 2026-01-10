@@ -1,0 +1,111 @@
+name: Integration Tests - WinCC OA
+
+on:
+  workflow_dispatch:
+    inputs:
+      node_version:
+        description: 'Required Node major version inside container (e.g. 20)'
+        required: false
+        default: '20'
+      docker_namespace:
+        description: 'Docker namespace to use (overrides default)'
+        required: false
+        default: ''
+      repo_name:
+        description: 'Repository name to use for image tag (overrides default)'
+        required: false
+        default: ''
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types:
+      - completed
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success' }}
+    env:
+      WORKDIR: /workspace
+      NODE_VERSION: ${{ github.event.inputs.node_version || '20' }}
+      REPO_NAME: ${{ github.event.inputs.repo_name != '' && github.event.inputs.repo_name || github.event.repository.name }}
+      DOCKER_NAMESPACE: ${{ github.event.inputs.docker_namespace != '' && github.event.inputs.docker_namespace || github.repository_owner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine WinCC OA image from package.json
+        id: image
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+        run: |
+          IMAGE=$(node -p "(require('./package.json').config && require('./package.json').config.winccoaImage) || '${DOCKER_USER:-mpokornyetm}/${{ env.DOCKER_NAMESPACE }}-${{ env.REPO_NAME }}:${{ env.REPO_NAME }}'")
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          echo "Using WinCC OA image: $IMAGE"
+
+      - name: Login to Docker Hub
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          if [ -n "$DOCKER_USER" ] && [ -n "$DOCKER_PASSWORD" ]; then
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
+          else
+            echo "Docker credentials not available, attempting to pull public image"
+          fi
+
+      - name: Pull WinCC OA image
+        run: docker pull $IMAGE
+
+      - name: Run WinCC OA container
+        run: |
+          docker run -d --name winccoa-ci \
+            -v "$GITHUB_WORKSPACE":$WORKDIR:rw \
+            -e CI=true \
+            -w $WORKDIR \
+            $IMAGE tail -f /dev/null
+
+      - name: Show Node on runner
+        run: node -v || true
+
+      - name: Wait for WinCC OA readiness
+        run: |
+          set -e
+          echo "Waiting for WinCC OA inside container..."
+          for i in {1..60}; do
+            docker exec winccoa-ci sh -c "[ -x /opt/WinCC_OA/bin/winccoa ] || true"
+            if [ $? -eq 0 ]; then
+              echo "Container responsive (attempt $i)";
+              break;
+            fi
+            sleep 2
+          done
+
+      - name: Run integration tests inside container
+        run: |
+          docker exec --user root winccoa-ci sh -c '
+            set -e
+            echo "Node version: $(node -v)"
+            echo "Starting integration tests under Xvfb"
+            xvfb-run -s "-screen 0 1280x1024x24" npm run ci:integration
+          '
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "==== docker logs ===="
+          docker logs winccoa-ci || true
+
+      - name: Stop and remove container
+        if: always()
+        run: |
+          docker rm -f winccoa-ci || true

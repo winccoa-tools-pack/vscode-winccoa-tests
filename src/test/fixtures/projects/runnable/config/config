@@ -1,0 +1,10 @@
+[general]
+pvss_path = "<WinCC_OA_PATH>"
+proj_path = "<WinCC_OA_PATH>/TestFramework_<WinCC_OA_VERSION>"
+proj_path = "C:/ws/oa-tools-pack/npm-winccoa-core/test/fixtures/projects/sub-proj"
+proj_path = "C:/ws/oa-tools-pack/npm-winccoa-core/test/fixtures/projects/runnable"
+proj_version = "<WinCC_OA_VERSION>"
+
+lang = "auto"
+langs = "de_AT.utf8"
+langs = "en_US.utf8"

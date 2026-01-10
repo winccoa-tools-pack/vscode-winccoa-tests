@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ExtensionOutputChannel } from './extensionOutput';
+import { ExtensionOutputChannel } from './extensionOutput.js';
 
 /**
  * Represents a parsed test case from CTRL code
@@ -36,13 +36,15 @@ export class TestParser {
 
     // Regex patterns
     private static readonly CLASS_PATTERN = /class\s+(\w+)\s*:\s*OaTest/g;
-    private static readonly GET_ALL_TEST_CASE_IDS_PATTERN = /getAllTestCaseIds\s*\(\s*\)\s*\{([^}]+)\}/s;
+    private static readonly GET_ALL_TEST_CASE_IDS_PATTERN =
+        /getAllTestCaseIds\s*\(\s*\)\s*\{([^}]+)\}/s;
     private static readonly MAKE_DYN_STRING_PATTERN = /makeDynString\s*\(([\s\S]*?)\)/;
     private static readonly STRING_LITERAL_PATTERN = /"([^"]+)"/g;
     // 3.20 format: public int test*() methods
     private static readonly TEST_METHOD_PATTERN = /public\s+int\s+(test\w*)\s*\(/gm;
     // Pattern for main function with string parameter
-    private static readonly MAIN_WITH_STRING_PARAM_PATTERN = /\b(void\s+)?main\s*\(\s*string\s+\w+\s*\)/;
+    private static readonly MAIN_WITH_STRING_PARAM_PATTERN =
+        /\b(void\s+)?main\s*\(\s*string\s+\w+\s*\)/;
 
     /**
      * Parse a CTRL file for test classes and test cases
@@ -59,28 +61,44 @@ export class TestParser {
             const testClasses = this.findTestClasses(content);
 
             if (testClasses.length === 0) {
-                ExtensionOutputChannel.trace(this.LOG_SOURCE, `No OaTest classes found in: ${fileUri.fsPath}`);
+                ExtensionOutputChannel.trace(
+                    this.LOG_SOURCE,
+                    `No OaTest classes found in: ${fileUri.fsPath}`,
+                );
                 return undefined;
             }
 
-            ExtensionOutputChannel.info(this.LOG_SOURCE, `Found ${testClasses.length} test class(es) in: ${fileUri.fsPath}`);
+            ExtensionOutputChannel.info(
+                this.LOG_SOURCE,
+                `Found ${testClasses.length} test class(es) in: ${fileUri.fsPath}`,
+            );
 
             // Check if file supports individual test execution
             const supportsIndividualTests = this.checkSupportsIndividualTests(content);
-            
+
             if (supportsIndividualTests) {
-                ExtensionOutputChannel.debug(this.LOG_SOURCE, `File supports individual test execution: ${fileUri.fsPath}`);
+                ExtensionOutputChannel.debug(
+                    this.LOG_SOURCE,
+                    `File supports individual test execution: ${fileUri.fsPath}`,
+                );
             } else {
-                ExtensionOutputChannel.debug(this.LOG_SOURCE, `File does NOT support individual test execution: ${fileUri.fsPath}`);
+                ExtensionOutputChannel.debug(
+                    this.LOG_SOURCE,
+                    `File does NOT support individual test execution: ${fileUri.fsPath}`,
+                );
             }
 
             return {
                 fileUri,
                 testClasses,
-                supportsIndividualTests
+                supportsIndividualTests,
             };
         } catch (error) {
-            ExtensionOutputChannel.error(this.LOG_SOURCE, `Failed to parse file: ${fileUri.fsPath}`, error as Error);
+            ExtensionOutputChannel.error(
+                this.LOG_SOURCE,
+                `Failed to parse file: ${fileUri.fsPath}`,
+                error as Error,
+            );
             return undefined;
         }
     }
@@ -90,7 +108,6 @@ export class TestParser {
      */
     private static findTestClasses(content: string): ParsedTestClass[] {
         const testClasses: ParsedTestClass[] = [];
-        const lines = content.split('\n');
 
         // Find all classes that inherit from OaTest
         let match;
@@ -102,7 +119,10 @@ export class TestParser {
             // Find line number
             const line = content.substring(0, classPosition).split('\n').length;
 
-            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Found test class: ${className} at line ${line}`);
+            ExtensionOutputChannel.debug(
+                this.LOG_SOURCE,
+                `Found test class: ${className} at line ${line}`,
+            );
 
             // Extract class body (rough extraction) - returns { body, startLine }
             const classBodyInfo = this.extractClassBody(content, classPosition);
@@ -114,9 +134,12 @@ export class TestParser {
                 testClasses.push({
                     className,
                     line,
-                    testCases
+                    testCases,
                 });
-                ExtensionOutputChannel.debug(this.LOG_SOURCE, `Class ${className} has ${testCases.length} test case(s)`);
+                ExtensionOutputChannel.debug(
+                    this.LOG_SOURCE,
+                    `Class ${className} has ${testCases.length} test case(s)`,
+                );
             }
         }
 
@@ -126,10 +149,13 @@ export class TestParser {
     /**
      * Extract class body (simple brace matching)
      */
-    private static extractClassBody(content: string, startPosition: number): { body: string; startLine: number } {
+    private static extractClassBody(
+        content: string,
+        startPosition: number,
+    ): { body: string; startLine: number } {
         let braceCount = 0;
-        let startBrace = content.indexOf('{', startPosition);
-        
+        const startBrace = content.indexOf('{', startPosition);
+
         if (startBrace === -1) {
             return { body: '', startLine: 0 };
         }
@@ -152,7 +178,7 @@ export class TestParser {
 
         return {
             body: content.substring(startBrace, endBrace + 1),
-            startLine
+            startLine,
         };
     }
 
@@ -160,18 +186,27 @@ export class TestParser {
      * Extract test cases from class body
      * Supports both 3.19 format (getAllTestCaseIds + switch/case) and 3.20 format (public test methods)
      */
-    private static extractTestCases(classBody: string, classBodyStartLine: number): ParsedTestCase[] {
+    private static extractTestCases(
+        classBody: string,
+        classBodyStartLine: number,
+    ): ParsedTestCase[] {
         // Try 3.19 format first (getAllTestCaseIds method)
         const testCases319 = this.extractTestCases319(classBody, classBodyStartLine);
         if (testCases319.length > 0) {
-            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Using 3.19 format (getAllTestCaseIds): ${testCases319.length} test(s)`);
+            ExtensionOutputChannel.debug(
+                this.LOG_SOURCE,
+                `Using 3.19 format (getAllTestCaseIds): ${testCases319.length} test(s)`,
+            );
             return testCases319;
         }
 
         // Try 3.20 format (public int test*() methods)
         const testCases320 = this.extractTestCases320(classBody, classBodyStartLine);
         if (testCases320.length > 0) {
-            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Using 3.20 format (test methods): ${testCases320.length} test(s)`);
+            ExtensionOutputChannel.debug(
+                this.LOG_SOURCE,
+                `Using 3.20 format (test methods): ${testCases320.length} test(s)`,
+            );
             return testCases320;
         }
 
@@ -182,13 +217,19 @@ export class TestParser {
     /**
      * Extract test cases from getAllTestCaseIds method (3.19 format)
      */
-    private static extractTestCases319(classBody: string, classBodyStartLine: number): ParsedTestCase[] {
+    private static extractTestCases319(
+        classBody: string,
+        classBodyStartLine: number,
+    ): ParsedTestCase[] {
         const testCases: ParsedTestCase[] = [];
 
         // Find getAllTestCaseIds method
         const methodMatch = this.GET_ALL_TEST_CASE_IDS_PATTERN.exec(classBody);
         if (!methodMatch) {
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, 'getAllTestCaseIds method not found (not 3.19 format)');
+            ExtensionOutputChannel.trace(
+                this.LOG_SOURCE,
+                'getAllTestCaseIds method not found (not 3.19 format)',
+            );
             return testCases;
         }
 
@@ -197,7 +238,10 @@ export class TestParser {
         // Find makeDynString call
         const makeDynStringMatch = this.MAKE_DYN_STRING_PATTERN.exec(methodBody);
         if (!makeDynStringMatch) {
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, 'makeDynString not found in getAllTestCaseIds');
+            ExtensionOutputChannel.trace(
+                this.LOG_SOURCE,
+                'makeDynString not found in getAllTestCaseIds',
+            );
             return testCases;
         }
 
@@ -208,15 +252,18 @@ export class TestParser {
         this.STRING_LITERAL_PATTERN.lastIndex = 0;
         while ((stringMatch = this.STRING_LITERAL_PATTERN.exec(argumentsString)) !== null) {
             const testCaseId = stringMatch[1];
-            
+
             // Find the line number of the corresponding case statement (absolute line in file)
             const caseLine = this.findCaseLineNumber(classBody, testCaseId, classBodyStartLine);
-            
+
             testCases.push({
                 id: testCaseId,
-                line: caseLine
+                line: caseLine,
             });
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Found test case (3.19): ${testCaseId}${caseLine ? ` at line ${caseLine}` : ''}`);
+            ExtensionOutputChannel.trace(
+                this.LOG_SOURCE,
+                `Found test case (3.19): ${testCaseId}${caseLine ? ` at line ${caseLine}` : ''}`,
+            );
         }
 
         return testCases;
@@ -225,7 +272,10 @@ export class TestParser {
     /**
      * Extract test cases from public test methods (3.20 format)
      */
-    private static extractTestCases320(classBody: string, classBodyStartLine: number): ParsedTestCase[] {
+    private static extractTestCases320(
+        classBody: string,
+        classBodyStartLine: number,
+    ): ParsedTestCase[] {
         const testCases: ParsedTestCase[] = [];
 
         // Find all public int test*() methods
@@ -241,9 +291,12 @@ export class TestParser {
 
             testCases.push({
                 id: methodName,
-                line: absoluteLine
+                line: absoluteLine,
             });
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Found test method (3.20): ${methodName} at line ${absoluteLine}`);
+            ExtensionOutputChannel.trace(
+                this.LOG_SOURCE,
+                `Found test method (3.20): ${methodName} at line ${absoluteLine}`,
+            );
         }
 
         return testCases;
@@ -252,18 +305,25 @@ export class TestParser {
     /**
      * Find the line number of a case statement in the switch
      */
-    private static findCaseLineNumber(classBody: string, testCaseId: string, classBodyStartLine: number): number | undefined {
+    private static findCaseLineNumber(
+        classBody: string,
+        testCaseId: string,
+        classBodyStartLine: number,
+    ): number | undefined {
         // Pattern: case "testCaseId":
-        const casePattern = new RegExp(`case\\s+"${testCaseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\s*:`, 'm');
+        const casePattern = new RegExp(
+            `case\\s+"${testCaseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\s*:`,
+            'm',
+        );
         const match = casePattern.exec(classBody);
-        
+
         if (match) {
             // Count lines before the match within class body
             const linesBeforeMatchInBody = classBody.substring(0, match.index).split('\n').length;
             // Add to class body start line to get absolute line number
             return classBodyStartLine + linesBeforeMatchInBody - 1;
         }
-        
+
         return undefined;
     }
 
@@ -274,10 +334,11 @@ export class TestParser {
         try {
             const document = await vscode.workspace.openTextDocument(fileUri);
             const content = document.getText();
-            
+
             // Quick check without full parsing
             return content.includes(': OaTest') || content.includes(':OaTest');
         } catch (error) {
+            console.error(`Error checking OaTest presence in file ${fileUri.fsPath}: ${error}`);
             return false;
         }
     }
@@ -292,30 +353,41 @@ export class TestParser {
         try {
             // Check 1: main function with string parameter
             if (!this.MAIN_WITH_STRING_PARAM_PATTERN.test(content)) {
-                ExtensionOutputChannel.debug(this.LOG_SOURCE, 'No main(string ...) signature found');
+                ExtensionOutputChannel.debug(
+                    this.LOG_SOURCE,
+                    'No main(string ...) signature found',
+                );
                 return false;
             }
 
             // Check 2: Extract main function body and check for startSingle
             const mainBodyMatch = content.match(/\bmain\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/);
             if (!mainBodyMatch) {
-                ExtensionOutputChannel.debug(this.LOG_SOURCE, 'Could not extract main function body');
+                ExtensionOutputChannel.debug(
+                    this.LOG_SOURCE,
+                    'Could not extract main function body',
+                );
                 return false;
             }
 
             const mainBody = mainBodyMatch[1];
             if (!mainBody.includes('startSingle')) {
-                ExtensionOutputChannel.debug(this.LOG_SOURCE, 'No startSingle call found in main()');
+                ExtensionOutputChannel.debug(
+                    this.LOG_SOURCE,
+                    'No startSingle call found in main()',
+                );
                 return false;
             }
 
-            ExtensionOutputChannel.debug(this.LOG_SOURCE, 'File supports individual test execution ✓');
+            ExtensionOutputChannel.debug(
+                this.LOG_SOURCE,
+                'File supports individual test execution ✓',
+            );
             return true;
-
         } catch (error) {
             ExtensionOutputChannel.warn(
                 this.LOG_SOURCE,
-                `Error checking individual test support - defaulting to false: ${error}`
+                `Error checking individual test support - defaulting to false: ${error}`,
             );
             return false;
         }

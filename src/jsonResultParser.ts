@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { ExtensionOutputChannel } from './extensionOutput';
+import { ExtensionOutputChannel } from './extensionOutput.js';
 
 /**
  * JSON result structure from WinCC OA test framework
@@ -27,6 +27,7 @@ export interface WinCCOATestResult {
         Aborted: number;
         Failed: number;
         Passed: number;
+        KnownBugs?: number;
     };
     TestCases: TestCaseEntry[];
 }
@@ -36,16 +37,18 @@ export interface WinCCOATestResult {
  */
 export interface TestCaseEntry {
     TcId: string;
-    Result: 'Pass' | 'Fail' | 'Aborted' | 'Undefined';
-    Note: string;
-    StartTimeStamp: string;
-    EndTimeStamp: string;
-    Duration: number;
-    Method: string;
-    Location: string;
-    StackTrace: string[];
-    ErrMsg: string;
+    Result: 'Pass' | 'Fail' | 'KnownBug' | 'Aborted' | 'Undefined';
+    Note?: string;
+    StartTimeStamp?: string;
+    EndTimeStamp?: string;
+    Duration?: number;
+    Method?: string;
+    Location?: string;
+    StackTrace?: string[];
+    ErrMsg?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     CurrentValue?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ReferenceValue?: any;
 }
 
@@ -67,7 +70,9 @@ export interface ParsedAssertion {
     status: 'passed' | 'failed' | 'aborted';
     message: string;
     stackTrace?: vscode.TestMessage[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expected?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     actual?: any;
     location?: vscode.Location;
 }
@@ -88,7 +93,7 @@ export class JsonResultParser {
      */
     public static async parseResults(
         projectRoot: string,
-        testCaseIds?: string[]
+        testCaseIds?: string[],
     ): Promise<Map<string, ParsedTestCase>> {
         const results = new Map<string, ParsedTestCase>();
 
@@ -98,7 +103,7 @@ export class JsonResultParser {
             if (!fs.existsSync(fullResultPath)) {
                 ExtensionOutputChannel.warn(
                     this.LOG_SOURCE,
-                    `Full result file not found: ${fullResultPath}`
+                    `Full result file not found: ${fullResultPath}`,
                 );
                 return results;
             }
@@ -107,9 +112,17 @@ export class JsonResultParser {
             const content = fs.readFileSync(fullResultPath, 'utf-8');
             const testResult: WinCCOATestResult = JSON.parse(content);
 
+            if (!testResult || !Array.isArray(testResult.TestCases)) {
+                ExtensionOutputChannel.warn(
+                    this.LOG_SOURCE,
+                    `Invalid result file format (missing TestCases array): ${fullResultPath}`,
+                );
+                return results;
+            }
+
             ExtensionOutputChannel.debug(
                 this.LOG_SOURCE,
-                `Parsing ${testResult.TestCases.length} test entries from ${fullResultPath}`
+                `Parsing ${testResult.TestCases.length} test entries from ${fullResultPath}`,
             );
 
             // Group test cases by TcId
@@ -127,24 +140,36 @@ export class JsonResultParser {
 
                 const parsedCase = this.parseTestCase(testId, entries);
                 results.set(testId, parsedCase);
-                
+
                 ExtensionOutputChannel.debug(
                     this.LOG_SOURCE,
-                    `Parsed ${testId}: status=${parsedCase.status}, assertions=${parsedCase.assertions.length}`
+                    `Parsed ${testId}: status=${parsedCase.status}, assertions=${parsedCase.assertions.length}`,
                 );
             }
 
+            const knownBugs = testResult.Statistic?.KnownBugs;
             ExtensionOutputChannel.success(
                 this.LOG_SOURCE,
-                `Parsed ${results.size} test case(s): ${testResult.Statistic.Passed} passed, ${testResult.Statistic.Failed} failed, ${testResult.Statistic.Aborted} aborted`
+                `Parsed ${results.size} test case(s): ${testResult.Statistic.Passed} passed, ${testResult.Statistic.Failed} failed, ${testResult.Statistic.Aborted} aborted${typeof knownBugs === 'number' ? `, ${knownBugs} known bugs` : ''}`,
             );
-
         } catch (error) {
             ExtensionOutputChannel.error(
                 this.LOG_SOURCE,
                 `Failed to parse test results from ${projectRoot}`,
-                error as Error
+                error as Error,
             );
+
+            // In unit tests the OutputChannel is often not initialized; surface the root cause.
+            if (!ExtensionOutputChannel.instance) {
+                console.error(
+                    `[${this.LOG_SOURCE}] Failed to parse test results from ${projectRoot}:`,
+                    error,
+                );
+                console.error(
+                    `[${this.LOG_SOURCE}] Failed to parse test results from ${projectRoot}:`,
+                    error,
+                );
+            }
         }
 
         return results;
@@ -183,7 +208,7 @@ export class JsonResultParser {
             // Track overall status (aborted has highest priority, then failed)
             if (entry.Result === 'Aborted') {
                 overallStatus = 'aborted';
-            } else if (entry.Result === 'Fail' && overallStatus !== 'aborted') {
+            } else if ((entry.Result === 'Fail' || entry.Result === 'KnownBug') && overallStatus !== 'aborted') {
                 overallStatus = 'failed';
             }
 
@@ -192,25 +217,26 @@ export class JsonResultParser {
             assertions.push(assertion);
 
             // Accumulate duration
-            totalDuration += entry.Duration;
+            totalDuration += entry.Duration ?? 0;
 
             // Collect message for summary
             if (entry.Result !== 'Pass') {
-                messages.push(`${entry.Result}: ${entry.Note}`);
+                messages.push(`${entry.Result}: ${entry.Note ?? ''}`.trim());
             }
         }
 
         // Build overall message
-        const message = messages.length > 0
-            ? messages.join('\n')
-            : `All ${assertions.length} assertion(s) passed`;
+        const message =
+            messages.length > 0
+                ? messages.join('\n')
+                : `All ${assertions.length} assertion(s) passed`;
 
         return {
             testId,
             status: overallStatus,
             message,
             duration: totalDuration,
-            assertions
+            assertions,
         };
     }
 
@@ -220,8 +246,8 @@ export class JsonResultParser {
     private static parseAssertion(entry: TestCaseEntry): ParsedAssertion {
         const status = this.mapResultToStatus(entry.Result);
         const message = this.buildAssertionMessage(entry);
-        const stackTrace = this.parseStackTrace(entry.StackTrace, entry.Location);
-        
+        const stackTrace = this.parseStackTrace(entry.StackTrace ?? []);
+
         // For Abort: don't use stack trace location (it points to startAll())
         // Location will be set from test definition in testController
         const location = entry.Result === 'Aborted' ? undefined : this.parseLocation(entry);
@@ -232,7 +258,7 @@ export class JsonResultParser {
             stackTrace,
             expected: entry.ReferenceValue,
             actual: entry.CurrentValue,
-            location
+            location,
         };
     }
 
@@ -244,6 +270,7 @@ export class JsonResultParser {
             case 'Pass':
                 return 'passed';
             case 'Fail':
+            case 'KnownBug':
                 return 'failed';
             case 'Aborted':
                 return 'aborted';
@@ -264,7 +291,7 @@ export class JsonResultParser {
         }
 
         // Add values for failed assertions
-        if (entry.Result === 'Fail') {
+        if (entry.Result === 'Fail' || entry.Result === 'KnownBug') {
             if (entry.CurrentValue !== undefined && entry.ReferenceValue !== undefined) {
                 parts.push(`Expected: ${JSON.stringify(entry.ReferenceValue)}`);
                 parts.push(`Actual: ${JSON.stringify(entry.CurrentValue)}`);
@@ -282,21 +309,60 @@ export class JsonResultParser {
     /**
      * Parse stack trace into VS Code TestMessage array
      */
-    private static parseStackTrace(stackTrace: string[], location: string): vscode.TestMessage[] {
+    private static parseStackTrace(stackTrace: string[]): vscode.TestMessage[] {
         const messages: vscode.TestMessage[] = [];
 
         for (const frame of stackTrace) {
             const loc = this.parseStackFrame(frame);
-            if (loc) {
-                const msg = new vscode.TestMessage(frame);
-                msg.location = loc;
-                messages.push(msg);
-            } else {
-                messages.push(new vscode.TestMessage(frame));
-            }
+            messages.push(this.createTestMessage(frame, loc));
         }
 
         return messages;
+    }
+
+    // Create a VS Code TestMessage when available; otherwise a lightweight fallback.
+    private static createTestMessage(
+        text: string,
+        location?: vscode.Location,
+    ): vscode.TestMessage {
+        const TestMessageCtor = (vscode as unknown as { TestMessage?: unknown }).TestMessage;
+        if (typeof TestMessageCtor === 'function') {
+            const msg = new (TestMessageCtor as new (message: string) => vscode.TestMessage)(text);
+            if (location) {
+                msg.location = location;
+            }
+            return msg;
+        }
+
+        return { message: text, location } as unknown as vscode.TestMessage;
+    }
+
+    // Create a VS Code Location when available; otherwise a lightweight fallback.
+    private static createLocation(filePath: string, lineNum1Based: number): vscode.Location {
+        const vscodeShape = vscode as unknown as {
+            Uri?: { file?: (path: string) => vscode.Uri };
+            Position?: new (line: number, character: number) => vscode.Position;
+            Location?: new (uri: vscode.Uri, position: vscode.Position) => vscode.Location;
+        };
+
+        const hasVscodeLocationApi =
+            typeof vscodeShape.Uri?.file === 'function' &&
+            typeof vscodeShape.Position === 'function' &&
+            typeof vscodeShape.Location === 'function';
+
+        if (hasVscodeLocationApi) {
+            const uri = vscode.Uri.file(filePath);
+            const position = new vscode.Position(lineNum1Based - 1, 0); // VS Code uses 0-based
+            return new vscode.Location(uri, position);
+        }
+
+        return {
+            uri: { fsPath: filePath, path: filePath, scheme: 'file' },
+            range: {
+                start: { line: lineNum1Based - 1, character: 0 },
+                end: { line: lineNum1Based - 1, character: 0 },
+            },
+        } as unknown as vscode.Location;
     }
 
     /**
@@ -316,9 +382,7 @@ export class JsonResultParser {
             return undefined;
         }
 
-        const uri = vscode.Uri.file(filePath);
-        const position = new vscode.Position(lineNum - 1, 0); // VS Code uses 0-based
-        return new vscode.Location(uri, position);
+        return this.createLocation(filePath, lineNum);
     }
 
     /**
@@ -326,40 +390,76 @@ export class JsonResultParser {
      * Uses StackTrace to get the actual line in the test script, not the library
      */
     private static parseLocation(entry: TestCaseEntry): vscode.Location | undefined {
-        // Try to parse from StackTrace first (contains actual test script line)
-        if (entry.StackTrace && entry.StackTrace.length > 0) {
-            // Get the script path from Location field
+        const stackTrace = entry.StackTrace ?? [];
+
+        // 1) Preferred: use StackTrace frame that matches Location's Script path
+        if (stackTrace.length > 0 && typeof entry.Location === 'string' && entry.Location.length > 0) {
             const scriptMatch = entry.Location.match(/Script:\s*(.+?)(?:\n|$)/);
             if (scriptMatch) {
                 const scriptPath = scriptMatch[1].trim();
-                
-                // Find the stack trace entry that matches this script path
-                for (const trace of entry.StackTrace) {
-                    // Format: "method at /path/to/file.ctl:123"
+                for (const trace of stackTrace) {
                     const atMatch = trace.match(/at\s+(.+?):(\d+)/);
-                    if (atMatch) {
-                        const tracePath = atMatch[1].trim();
-                        const lineNum = parseInt(atMatch[2], 10);
-                        
-                        // Check if this trace entry is from the test script (not library)
-                        if (tracePath === scriptPath || tracePath.endsWith(path.basename(scriptPath))) {
-                            ExtensionOutputChannel.debug(
-                                this.LOG_SOURCE,
-                                `Parsed location from StackTrace: ${tracePath}:${lineNum}`
-                            );
-                            const uri = vscode.Uri.file(tracePath);
-                            const position = new vscode.Position(lineNum - 1, 0);
-                            return new vscode.Location(uri, position);
-                        }
+                    if (!atMatch) {
+                        continue;
+                    }
+                    const tracePath = atMatch[1].trim();
+                    const lineNum = parseInt(atMatch[2], 10);
+                    if (!tracePath || Number.isNaN(lineNum)) {
+                        continue;
+                    }
+                    if (tracePath === scriptPath || tracePath.endsWith(path.basename(scriptPath))) {
+                        ExtensionOutputChannel.debug(
+                            this.LOG_SOURCE,
+                            `Parsed location from StackTrace (script match): ${tracePath}:${lineNum}`,
+                        );
+                        return this.createLocation(tracePath, lineNum);
                     }
                 }
             }
         }
 
+        // 2) Fallback: choose a reasonable StackTrace frame even if Location is missing
+        // Some real test outputs do not provide a Location field at all.
+        if (stackTrace.length > 0) {
+            const candidates = stackTrace
+                .map((trace) => {
+                    const atMatch = trace.match(/at\s+(.+?):(\d+)/);
+                    if (!atMatch) {
+                        return undefined;
+                    }
+                    const tracePath = atMatch[1].trim();
+                    const lineNum = parseInt(atMatch[2], 10);
+                    if (!tracePath || Number.isNaN(lineNum)) {
+                        return undefined;
+                    }
+                    return { tracePath, lineNum };
+                })
+                .filter((v): v is { tracePath: string; lineNum: number } => !!v);
+
+            const nonLibrary = candidates.find(
+                (c) =>
+                    !c.tracePath.toLowerCase().includes('oatestbase.ctl') &&
+                    c.tracePath.toLowerCase().endsWith('.ctl'),
+            );
+
+            const best = nonLibrary ?? candidates[0];
+            if (best) {
+                ExtensionOutputChannel.debug(
+                    this.LOG_SOURCE,
+                    `Parsed location from StackTrace (fallback): ${best.tracePath}:${best.lineNum}`,
+                );
+                return this.createLocation(best.tracePath, best.lineNum);
+            }
+        }
+
         // Fallback to Location field (library line number - not ideal but better than nothing)
+        if (typeof entry.Location !== 'string' || entry.Location.length === 0) {
+            return undefined;
+        }
+
         ExtensionOutputChannel.debug(
             this.LOG_SOURCE,
-            `Parsing location from Location field: ${JSON.stringify(entry.Location)}`
+            `Parsing location from Location field: ${JSON.stringify(entry.Location)}`,
         );
 
         const scriptMatch = entry.Location.match(/Script:\s*(.+?)(?:\n|$)/);
@@ -368,7 +468,7 @@ export class JsonResultParser {
         if (!scriptMatch || !lineMatch) {
             ExtensionOutputChannel.warn(
                 this.LOG_SOURCE,
-                `Failed to parse location: scriptMatch=${!!scriptMatch}, lineMatch=${!!lineMatch}`
+                `Failed to parse location: scriptMatch=${!!scriptMatch}, lineMatch=${!!lineMatch}`,
             );
             return undefined;
         }
@@ -379,19 +479,17 @@ export class JsonResultParser {
         if (!filePath || isNaN(lineNum)) {
             ExtensionOutputChannel.warn(
                 this.LOG_SOURCE,
-                `Invalid location data: filePath="${filePath}", lineNum=${lineNum}`
+                `Invalid location data: filePath="${filePath}", lineNum=${lineNum}`,
             );
             return undefined;
         }
 
         ExtensionOutputChannel.debug(
             this.LOG_SOURCE,
-            `Parsed location from Location field (fallback): ${filePath}:${lineNum}`
+            `Parsed location from Location field (fallback): ${filePath}:${lineNum}`,
         );
 
-        const uri = vscode.Uri.file(filePath);
-        const position = new vscode.Position(lineNum - 1, 0);
-        return new vscode.Location(uri, position);
+        return this.createLocation(filePath, lineNum);
     }
 
     /**
@@ -406,15 +504,12 @@ export class JsonResultParser {
             fs.writeFileSync(fullResultPath, '{}', 'utf-8');
             fs.writeFileSync(quickResultPath, '{}', 'utf-8');
 
-            ExtensionOutputChannel.debug(
-                this.LOG_SOURCE,
-                `Created result files in ${projectRoot}`
-            );
+            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Created result files in ${projectRoot}`);
         } catch (error) {
             ExtensionOutputChannel.error(
                 this.LOG_SOURCE,
                 `Failed to create result files in ${projectRoot}`,
-                error as Error
+                error as Error,
             );
         }
     }
@@ -437,13 +532,13 @@ export class JsonResultParser {
 
             ExtensionOutputChannel.debug(
                 this.LOG_SOURCE,
-                `Deleted result files from ${projectRoot}`
+                `Deleted result files from ${projectRoot}`,
             );
         } catch (error) {
             ExtensionOutputChannel.error(
                 this.LOG_SOURCE,
                 `Failed to delete result files from ${projectRoot}`,
-                error as Error
+                error as Error,
             );
         }
     }

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { ExtensionOutputChannel } from './extensionOutput';
+import { ExtensionOutputChannel } from './extensionOutput.js';
+import * as path from 'path';
 
 /**
  * Test runner that executes tests using WinCC OA Script Actions extension
@@ -17,30 +18,38 @@ export class TestRunner {
 
     /**
      * Execute a test file using Script Actions
-     * 
+     *
      * @param fileUri URI of the test file to execute
      * @returns Promise that resolves with exit code when process completes (0 = success, other = error, null = killed)
      */
     private static runningProcess: import('child_process').ChildProcess | null = null;
     private static processExitResolver: ((code: number | null) => void) | null = null;
 
-    public static async executeTestFile(fileUri: vscode.Uri, cancelToken?: vscode.CancellationToken): Promise<number | null> {
+    public static async executeTestFile(
+        fileUri: vscode.Uri,
+        cancelToken?: vscode.CancellationToken,
+    ): Promise<number | null> {
         const { spawn } = await import('child_process');
         try {
             if (!this.isScriptActionsAvailable()) {
                 ExtensionOutputChannel.warn(
                     this.LOG_SOURCE,
-                    'WinCC OA Script Actions extension is not available. Please install it to run tests.'
+                    'WinCC OA Script Actions extension is not available. Please install it to run tests.',
                 );
-                vscode.window.showWarningMessage(
-                    'WinCC OA Script Actions extension is required to run tests.',
-                    'Install Extension',
-                    'Dismiss'
-                ).then(selection => {
-                    if (selection === 'Install Extension') {
-                        vscode.commands.executeCommand('workbench.extensions.search', '@id:RichardJanisch.winccoa-script-actions');
-                    }
-                });
+                vscode.window
+                    .showWarningMessage(
+                        'WinCC OA Script Actions extension is required to run tests.',
+                        'Install Extension',
+                        'Dismiss',
+                    )
+                    .then((selection) => {
+                        if (selection === 'Install Extension') {
+                            vscode.commands.executeCommand(
+                                'workbench.extensions.search',
+                                '@id:RichardJanisch.winccoa-script-actions',
+                            );
+                        }
+                    });
                 return -1;
             }
 
@@ -49,20 +58,25 @@ export class TestRunner {
             // Get config - either from static settings or Core extension
             const scriptActionsConfig = vscode.workspace.getConfiguration('winccoa.scriptActions');
             const pathSource = scriptActionsConfig.get<string>('pathSource', 'static');
-            
+
             let installPath = '';
             let projectName = '';
-            
+
             if (pathSource === 'automatic') {
                 // Get from Core extension API
-                const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-project-admin');
+                const coreExtension = vscode.extensions.getExtension(
+                    'RichardJanisch.winccoa-project-admin',
+                );
                 if (coreExtension?.isActive) {
                     const coreApi = coreExtension.exports;
                     const currentProject = coreApi.getCurrentProject?.();
                     if (currentProject) {
                         installPath = currentProject.oaInstallPath || '';
                         projectName = currentProject.name || '';
-                        ExtensionOutputChannel.debug(this.LOG_SOURCE, `Using Core API: installPath=${installPath}, projectName=${projectName}`);
+                        ExtensionOutputChannel.debug(
+                            this.LOG_SOURCE,
+                            `Using Core API: installPath=${installPath}, projectName=${projectName}`,
+                        );
                     }
                 }
             } else {
@@ -70,15 +84,17 @@ export class TestRunner {
                 installPath = scriptActionsConfig.get<string>('installPath', '');
                 projectName = scriptActionsConfig.get<string>('projectName', '');
             }
-            
+
             if (!installPath || !projectName) {
-                ExtensionOutputChannel.error(this.LOG_SOURCE, `Missing config: installPath=${installPath}, projectName=${projectName}`);
+                ExtensionOutputChannel.error(
+                    this.LOG_SOURCE,
+                    `Missing config: installPath=${installPath}, projectName=${projectName}`,
+                );
                 return -1;
             }
-            
-            const binPath = installPath.replace(/[\/]+$/, '') + '/bin';
+
             const executable = process.platform === 'win32' ? 'WCCOActrl.exe' : 'WCCOActrl';
-            const fullExecutablePath = binPath + '/' + executable;
+            const fullExecutablePath = path.normalize(installPath + '/bin/' + executable);
             const scriptPath = fileUri.fsPath;
             const args = [scriptPath, '-proj', projectName, '-n'];
 
@@ -96,7 +112,10 @@ export class TestRunner {
                 cancelToken.onCancellationRequested(() => {
                     if (TestRunner.runningProcess) {
                         TestRunner.runningProcess.kill();
-                        ExtensionOutputChannel.info(this.LOG_SOURCE, 'Test process killed due to cancellation');
+                        ExtensionOutputChannel.info(
+                            this.LOG_SOURCE,
+                            'Test process killed due to cancellation',
+                        );
                         TestRunner.runningProcess = null;
                         if (TestRunner.processExitResolver) {
                             TestRunner.processExitResolver(null);
@@ -111,12 +130,15 @@ export class TestRunner {
                 if (code !== 0 && code !== null) {
                     ExtensionOutputChannel.error(
                         this.LOG_SOURCE,
-                        `Test process exited with error code ${code}. Check WinCC OA Script Actions output for details.`
+                        `Test process exited with error code ${code}. Check WinCC OA Script Actions output for details.`,
                     );
                 } else {
-                    ExtensionOutputChannel.info(this.LOG_SOURCE, `Test process exited with code ${code}`);
+                    ExtensionOutputChannel.info(
+                        this.LOG_SOURCE,
+                        `Test process exited with code ${code}`,
+                    );
                 }
-                
+
                 // Resolve promise with exit code
                 if (TestRunner.processExitResolver) {
                     TestRunner.processExitResolver(code);
@@ -126,17 +148,16 @@ export class TestRunner {
 
             ExtensionOutputChannel.success(
                 this.LOG_SOURCE,
-                `Test execution started successfully (cancelable)`
+                `Test execution started successfully (cancelable)`,
             );
-            
+
             // Wait for process to complete and return exit code
             return await exitPromise;
-
         } catch (error) {
             ExtensionOutputChannel.error(
                 this.LOG_SOURCE,
                 `Failed to execute test file: ${fileUri.fsPath}`,
-                error as Error
+                error as Error,
             );
             return -1; // Return -1 for internal errors
         }
@@ -144,50 +165,67 @@ export class TestRunner {
 
     /**
      * Execute a test file with arguments using Script Actions
-     * 
+     *
      * @param fileUri URI of the test file to execute
      * @param testCaseId ID of the test case to execute
      * @returns Promise that resolves with exit code when process completes (0 = success, other = error, null = killed)
      */
-    public static async executeScriptWithArgs(fileUri: vscode.Uri, testCaseId: string, cancelToken?: vscode.CancellationToken): Promise<number | null> {
+    public static async executeScriptWithArgs(
+        fileUri: vscode.Uri,
+        testCaseId: string,
+        cancelToken?: vscode.CancellationToken,
+    ): Promise<number | null> {
         const { spawn } = await import('child_process');
         try {
             if (!this.isScriptActionsAvailable()) {
                 ExtensionOutputChannel.warn(
                     this.LOG_SOURCE,
-                    'WinCC OA Script Actions extension is not available. Please install it to run tests.'
+                    'WinCC OA Script Actions extension is not available. Please install it to run tests.',
                 );
-                vscode.window.showWarningMessage(
-                    'WinCC OA Script Actions extension is required to run tests.',
-                    'Install Extension',
-                    'Dismiss'
-                ).then(selection => {
-                    if (selection === 'Install Extension') {
-                        vscode.commands.executeCommand('workbench.extensions.search', '@id:RichardJanisch.winccoa-script-actions');
-                    }
-                });
+                vscode.window
+                    .showWarningMessage(
+                        'WinCC OA Script Actions extension is required to run tests.',
+                        'Install Extension',
+                        'Dismiss',
+                    )
+                    .then((selection) => {
+                        if (selection === 'Install Extension') {
+                            vscode.commands.executeCommand(
+                                'workbench.extensions.search',
+                                '@id:RichardJanisch.winccoa-script-actions',
+                            );
+                        }
+                    });
                 return -1;
             }
 
-            ExtensionOutputChannel.info(this.LOG_SOURCE, `Executing test with args: ${fileUri.fsPath} ${testCaseId}`);
+            ExtensionOutputChannel.info(
+                this.LOG_SOURCE,
+                `Executing test with args: ${fileUri.fsPath} ${testCaseId}`,
+            );
 
             // Get config - either from static settings or Core extension
             const scriptActionsConfig = vscode.workspace.getConfiguration('winccoa.scriptActions');
             const pathSource = scriptActionsConfig.get<string>('pathSource', 'static');
-            
+
             let installPath = '';
             let projectName = '';
-            
+
             if (pathSource === 'automatic') {
                 // Get from Core extension API
-                const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-project-admin');
+                const coreExtension = vscode.extensions.getExtension(
+                    'RichardJanisch.winccoa-project-admin',
+                );
                 if (coreExtension?.isActive) {
                     const coreApi = coreExtension.exports;
                     const currentProject = coreApi.getCurrentProject?.();
                     if (currentProject) {
                         installPath = currentProject.oaInstallPath || '';
                         projectName = currentProject.name || '';
-                        ExtensionOutputChannel.debug(this.LOG_SOURCE, `Using Core API: installPath=${installPath}, projectName=${projectName}`);
+                        ExtensionOutputChannel.debug(
+                            this.LOG_SOURCE,
+                            `Using Core API: installPath=${installPath}, projectName=${projectName}`,
+                        );
                     }
                 }
             } else {
@@ -195,15 +233,17 @@ export class TestRunner {
                 installPath = scriptActionsConfig.get<string>('installPath', '');
                 projectName = scriptActionsConfig.get<string>('projectName', '');
             }
-            
+
             if (!installPath || !projectName) {
-                ExtensionOutputChannel.error(this.LOG_SOURCE, `Missing config: installPath=${installPath}, projectName=${projectName}`);
+                ExtensionOutputChannel.error(
+                    this.LOG_SOURCE,
+                    `Missing config: installPath=${installPath}, projectName=${projectName}`,
+                );
                 return -1;
             }
-            
-            const binPath = installPath.replace(/[\/]+$/, '') + '/bin';
+
             const executable = process.platform === 'win32' ? 'WCCOActrl.exe' : 'WCCOActrl';
-            const fullExecutablePath = binPath + '/' + executable;
+            const fullExecutablePath = path.normalize(installPath + '/bin/' + executable);
             const scriptPath = fileUri.fsPath;
             const args = [scriptPath, '-proj', projectName, '-n', testCaseId];
 
@@ -221,7 +261,10 @@ export class TestRunner {
                 cancelToken.onCancellationRequested(() => {
                     if (TestRunner.runningProcess) {
                         TestRunner.runningProcess.kill();
-                        ExtensionOutputChannel.info(this.LOG_SOURCE, 'Test process killed due to cancellation');
+                        ExtensionOutputChannel.info(
+                            this.LOG_SOURCE,
+                            'Test process killed due to cancellation',
+                        );
                         TestRunner.runningProcess = null;
                         if (TestRunner.processExitResolver) {
                             TestRunner.processExitResolver(null);
@@ -236,12 +279,15 @@ export class TestRunner {
                 if (code !== 0 && code !== null) {
                     ExtensionOutputChannel.error(
                         this.LOG_SOURCE,
-                        `Test process exited with error code ${code}. Check WinCC OA Script Actions output for details.`
+                        `Test process exited with error code ${code}. Check WinCC OA Script Actions output for details.`,
                     );
                 } else {
-                    ExtensionOutputChannel.info(this.LOG_SOURCE, `Test process exited with code ${code}`);
+                    ExtensionOutputChannel.info(
+                        this.LOG_SOURCE,
+                        `Test process exited with code ${code}`,
+                    );
                 }
-                
+
                 // Resolve promise with exit code
                 if (TestRunner.processExitResolver) {
                     TestRunner.processExitResolver(code);
@@ -251,17 +297,16 @@ export class TestRunner {
 
             ExtensionOutputChannel.success(
                 this.LOG_SOURCE,
-                `Test execution with args started successfully (cancelable)`
+                `Test execution with args started successfully (cancelable)`,
             );
-            
+
             // Wait for process to complete and return exit code
             return await exitPromise;
-
         } catch (error) {
             ExtensionOutputChannel.error(
                 this.LOG_SOURCE,
                 `Failed to execute test with args: ${fileUri.fsPath}`,
-                error as Error
+                error as Error,
             );
             return -1; // Return -1 for internal errors
         }
@@ -272,10 +317,11 @@ export class TestRunner {
      */
     public static async getAvailableScriptActionsCommands(): Promise<string[]> {
         const allCommands = await vscode.commands.getCommands(true);
-        return allCommands.filter(cmd => 
-            cmd.includes('script-actions') || 
-            cmd.includes('scriptActions') ||
-            cmd.includes('winccoa')
+        return allCommands.filter(
+            (cmd) =>
+                cmd.includes('script-actions') ||
+                cmd.includes('scriptActions') ||
+                cmd.includes('winccoa'),
         );
     }
 }

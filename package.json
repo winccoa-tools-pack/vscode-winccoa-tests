@@ -2,8 +2,8 @@
   "name": "winccoa-vscode-tests",
   "displayName": "WinCC OA Test Explorer",
   "description": "Test Explorer integration for WinCC OA unit tests in Visual Studio Code",
-  "publisher": "RichardJanisch",
   "version": "1.0.6",
+  "publisher": "winccoa-tools-pack",
   "author": "Richard Janisch",
   "license": "MIT",
   "icon": "resources/wincc_oa_tests_icon_512.png",
@@ -11,8 +11,12 @@
     "type": "git",
     "url": "https://github.com/winccoa-tools-pack/vscode-winccoa-tests"
   },
+  "bugs": {
+    "url": "https://github.com/winccoa-tools-pack/vscode-winccoa-tests/issues"
+  },
+  "homepage": "https://github.com/winccoa-tools-pack/vscode-winccoa-tests#readme",
   "engines": {
-    "vscode": "^1.106.0"
+    "vscode": "^1.108.0"
   },
   "categories": [
     "Testing",
@@ -23,17 +27,25 @@
     "RichardJanisch.winccoa-project-admin"
   ],
   "keywords": [
-    "wincc",
-    "oa",
+    "wincc-oa",
+    "scada",
+    "hmi",
+    "siemens",
+    "etm",
+    "industrial",
+    "automation",
+    "testing",
     "test",
     "unittest",
-    "test-explorer"
+    "test-explorer",
+    "wincc-oa-test",
+    "oa-test"
   ],
   "activationEvents": [
     "workspaceContains:**/*.ctl",
     "onLanguage:ctrl"
   ],
-  "main": "dist/extension.js",
+  "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
@@ -113,26 +125,38 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./ && npm run copy-fixtures",
-    "copy-fixtures": "copyfiles -u 1 \"src/test/fixtures/**/*\" dist/test/fixtures",
+    "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node ./dist/test/runTest.js",
-    "lint": "eslint src --ext ts",
-    "package": "vsce package"
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "lint:md": "markdownlint \"**/*.md\" --ignore node_modules",
+    "lint:md:fix": "markdownlint \"**/*.md\" --ignore node_modules --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/glob": "^8.1.0",
+    "@types/vscode": "^1.108.0",
+    "@eslint/js": "^9.39.2",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^20.0.0",
-    "@types/vscode": "^1.106.2",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "@vscode/test-electron": "^2.5.2",
-    "@vscode/vsce": "^2.22.0",
+    "@types/node": "22.x",
+    "@vscode/vsce": "^3.7.1",
+    "@winccoa-tools-pack/npm-winccoa-core": "^0.1.1",
     "copyfiles": "^2.4.1",
-    "eslint": "^8.0.0",
+    "eslint": "^9.39.2",
     "glob": "^13.0.0",
+    "markdownlint-cli": "^0.47.0",
     "mocha": "^11.7.5",
-    "typescript": "^5.2.0"
+    "prettier": "^3.3.3",
+    "source-map": "^0.8.0-beta.0",
+    "ts-loader": "^9.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.51.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^5.1.4"
   }
 }

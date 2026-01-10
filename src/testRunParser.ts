@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { ExtensionOutputChannel } from './extensionOutput';
+import { ExtensionOutputChannel } from './extensionOutput.js';
 
 /**
  * Stack trace location
@@ -56,7 +56,8 @@ export class TestRunParser {
     private static readonly LOG_SOURCE = 'TestRunParser';
 
     // Regex patterns
-    private static readonly TIMESTAMP_PATTERN = /^WCCOActrl\s+\(\d+\),\s+(\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}\.\d{3})/;
+    private static readonly TIMESTAMP_PATTERN =
+        /^WCCOActrl\s+\(\d+\),\s+(\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}\.\d{3})/;
     private static readonly TEST_START_PATTERN = /\(INFO\) Testcase '([^']+)' write message:/;
     private static readonly TEST_START_NOTE = /Note:\s*Start the test case/;
     private static readonly TEST_PASSED_PATTERN = /\(OK\) Testcase '([^']+)' passed/;
@@ -79,19 +80,21 @@ export class TestRunParser {
     public static async parseTestRun(
         logPath: string,
         testCaseIds: string[],
-        startTime?: Date
     ): Promise<TestRunResult> {
         const testCases = new Map<string, TestCaseResult>();
 
         try {
-            ExtensionOutputChannel.debug(this.LOG_SOURCE, `Parsing test run for ${testCaseIds.length} test case(s)`);
+            ExtensionOutputChannel.debug(
+                this.LOG_SOURCE,
+                `Parsing test run for ${testCaseIds.length} test case(s)`,
+            );
 
             // Read entire file (we'll optimize this later if needed)
             const content = fs.readFileSync(logPath, 'utf-8');
             const lines = content.split('\n');
 
             // Parse backwards to find test blocks
-            const testBlocks = this.extractTestBlocks(lines, testCaseIds, startTime);
+            const testBlocks = this.extractTestBlocks(lines, testCaseIds);
 
             // Parse each test block
             for (const block of testBlocks) {
@@ -105,7 +108,7 @@ export class TestRunParser {
             const summary = {
                 passed: 0,
                 failed: 0,
-                aborted: 0
+                aborted: 0,
             };
 
             for (const testCase of testCases.values()) {
@@ -120,16 +123,15 @@ export class TestRunParser {
 
             ExtensionOutputChannel.success(
                 this.LOG_SOURCE,
-                `Parsed ${testCases.size} test case(s): ${summary.passed} passed, ${summary.failed} failed, ${summary.aborted} aborted`
+                `Parsed ${testCases.size} test case(s): ${summary.passed} passed, ${summary.failed} failed, ${summary.aborted} aborted`,
             );
 
             return { testCases, summary };
-
         } catch (error) {
             ExtensionOutputChannel.error(
                 this.LOG_SOURCE,
                 `Failed to parse test run: ${logPath}`,
-                error as Error
+                error as Error,
             );
             return { testCases, summary: { passed: 0, failed: 0, aborted: 0 } };
         }
@@ -139,19 +141,13 @@ export class TestRunParser {
      * Extract test blocks from log lines
      * Returns array of line arrays, each representing one test case
      */
-    private static extractTestBlocks(
-        lines: string[],
-        testCaseIds: string[],
-        startTime?: Date
-    ): string[][] {
+    private static extractTestBlocks(lines: string[], testCaseIds: string[]): string[][] {
         const blocks: string[][] = [];
         let currentBlock: string[] = [];
-        let currentTestId: string | undefined;
-        let inTestBlock = false;
 
         ExtensionOutputChannel.debug(
             this.LOG_SOURCE,
-            `Extracting test blocks for IDs: ${testCaseIds.join(', ')}`
+            `Extracting test blocks for IDs: ${testCaseIds.join(', ')}`,
         );
 
         // Process from end to beginning
@@ -163,13 +159,14 @@ export class TestRunParser {
             const startMatch = this.TEST_START_PATTERN.exec(line);
             if (startMatch) {
                 const testId = startMatch[1];
-                
+
                 // Check next line for "Note: Start the test case"
-                const hasStartNote = i + 1 < lines.length && this.TEST_START_NOTE.test(lines[i + 1]);
-                
+                const hasStartNote =
+                    i + 1 < lines.length && this.TEST_START_NOTE.test(lines[i + 1]);
+
                 ExtensionOutputChannel.debug(
                     this.LOG_SOURCE,
-                    `Found test start marker for '${testId}' at line ${i}, hasStartNote: ${hasStartNote}`
+                    `Found test start marker for '${testId}' at line ${i}, hasStartNote: ${hasStartNote}`,
                 );
 
                 if (hasStartNote) {
@@ -180,21 +177,19 @@ export class TestRunParser {
                         // 2. Note line
                         // 3. Rest of the block (currently in reverse order)
                         const finalBlock = [
-                            line,           // (INFO) Testcase 'xxx' write message:
-                            lines[i + 1],   // Note: Start the test case
-                            ...currentBlock.reverse()  // Rest of the block in correct order
+                            line, // (INFO) Testcase 'xxx' write message:
+                            lines[i + 1], // Note: Start the test case
+                            ...currentBlock.reverse(), // Rest of the block in correct order
                         ];
                         blocks.push(finalBlock);
                         ExtensionOutputChannel.debug(
                             this.LOG_SOURCE,
-                            `Saved block for '${testId}' with ${finalBlock.length} lines`
+                            `Saved block for '${testId}' with ${finalBlock.length} lines`,
                         );
                     }
 
                     // Reset for next block (going backward)
-                    currentTestId = testId;
                     currentBlock = [];
-                    inTestBlock = false;
 
                     continue;
                 }
@@ -206,7 +201,7 @@ export class TestRunParser {
 
         ExtensionOutputChannel.debug(
             this.LOG_SOURCE,
-            `Extracted ${blocks.length} test block(s) from ${lines.length} log lines`
+            `Extracted ${blocks.length} test block(s) from ${lines.length} log lines`,
         );
 
         return blocks;
@@ -223,7 +218,10 @@ export class TestRunParser {
         // Extract test case ID from first line
         const startMatch = this.TEST_START_PATTERN.exec(lines[0]);
         if (!startMatch) {
-            ExtensionOutputChannel.warn(this.LOG_SOURCE, `No start match in first line: ${lines[0]}`);
+            ExtensionOutputChannel.warn(
+                this.LOG_SOURCE,
+                `No start match in first line: ${lines[0]}`,
+            );
             return null;
         }
 
@@ -234,7 +232,7 @@ export class TestRunParser {
 
         ExtensionOutputChannel.debug(
             this.LOG_SOURCE,
-            `Parsing test block for '${testCaseId}' with ${lines.length} lines`
+            `Parsing test block for '${testCaseId}' with ${lines.length} lines`,
         );
 
         // Extract start timestamp from first line
@@ -289,15 +287,15 @@ export class TestRunParser {
 
         // Determine final status
         let status: 'passed' | 'failed' | 'aborted' = 'passed';
-        if (assertions.some(a => a.type === 'aborted')) {
+        if (assertions.some((a) => a.type === 'aborted')) {
             status = 'aborted';
-        } else if (assertions.some(a => a.type === 'failed')) {
+        } else if (assertions.some((a) => a.type === 'failed')) {
             status = 'failed';
         }
 
         ExtensionOutputChannel.debug(
             this.LOG_SOURCE,
-            `Parsed test '${testCaseId}': ${assertions.length} assertion(s), status: ${status}`
+            `Parsed test '${testCaseId}': ${assertions.length} assertion(s), status: ${status}`,
         );
 
         return {
@@ -305,7 +303,7 @@ export class TestRunParser {
             status,
             startTimestamp,
             endTimestamp,
-            assertions
+            assertions,
         };
     }
 
@@ -315,7 +313,7 @@ export class TestRunParser {
     private static parseAssertion(
         lines: string[],
         startIndex: number,
-        type: 'passed' | 'failed' | 'aborted'
+        type: 'passed' | 'failed' | 'aborted',
     ): AssertionResult | null {
         const line = lines[startIndex];
 
@@ -343,10 +341,12 @@ export class TestRunParser {
             const currentLine = lines[i];
 
             // Check if we've reached the next assertion or test
-            if (this.TEST_PASSED_PATTERN.test(currentLine) ||
+            if (
+                this.TEST_PASSED_PATTERN.test(currentLine) ||
                 this.TEST_FAILED_PATTERN.test(currentLine) ||
                 this.TEST_ABORTED_PATTERN.test(currentLine) ||
-                this.TEST_START_PATTERN.test(currentLine)) {
+                this.TEST_START_PATTERN.test(currentLine)
+            ) {
                 break;
             }
 
@@ -372,7 +372,7 @@ export class TestRunParser {
                 stackTrace.push({
                     functionName: stackMatch[1].trim(),
                     filePath: stackMatch[2],
-                    line: parseInt(stackMatch[3], 10)
+                    line: parseInt(stackMatch[3], 10),
                 });
                 i++;
                 continue;
@@ -403,7 +403,11 @@ export class TestRunParser {
             }
 
             // Empty line or unrecognized - continue
-            if (currentLine.trim() === '' || currentLine.startsWith('\t') || currentLine.startsWith('  ')) {
+            if (
+                currentLine.trim() === '' ||
+                currentLine.startsWith('\t') ||
+                currentLine.startsWith('  ')
+            ) {
                 i++;
                 continue;
             }
@@ -421,7 +425,7 @@ export class TestRunParser {
             scriptPath,
             libraryPath,
             line: lineNumber,
-            timestamp
+            timestamp,
         };
     }
 }

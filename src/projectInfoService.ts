@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { ExtensionOutputChannel } from './extensionOutput';
+import { ExtensionOutputChannel } from './extensionOutput.js';
 
 /**
  * Project information including paths to config, log, etc.
@@ -16,7 +16,7 @@ export interface ProjectInfo {
 
 /**
  * Service to retrieve WinCC OA project information.
- * 
+ *
  * Current implementation: Basic workspace detection
  * Future: Will be replaced/extended with external npm library
  *         for comprehensive project detection
@@ -26,43 +26,43 @@ export class ProjectInfoService {
 
     /**
      * Get project information based on configuration
-     * 
+     *
      * @param workspaceFolder Workspace folder to analyze
      * @returns ProjectInfo or undefined if not found
      */
     public static async getProjectInfo(
-        workspaceFolder: vscode.WorkspaceFolder
+        workspaceFolder: vscode.WorkspaceFolder,
     ): Promise<ProjectInfo | undefined> {
         const config = vscode.workspace.getConfiguration('winccoaTests');
         const sourceType = config.get<string>('projectSourceType', 'workspace');
 
         ExtensionOutputChannel.debug(
             this.LOG_SOURCE,
-            `Getting project info with sourceType: ${sourceType}`
+            `Getting project info with sourceType: ${sourceType}`,
         );
 
         switch (sourceType) {
             case 'workspace':
                 return this.getProjectInfoFromWorkspace(workspaceFolder);
-            
+
             case 'automatic':
                 ExtensionOutputChannel.warn(
                     this.LOG_SOURCE,
-                    'Automatic project detection not yet implemented (Coming Soon)'
+                    'Automatic project detection not yet implemented (Coming Soon)',
                 );
                 return undefined;
-            
+
             case 'static':
                 ExtensionOutputChannel.warn(
                     this.LOG_SOURCE,
-                    'Static project path not yet implemented (Coming Soon)'
+                    'Static project path not yet implemented (Coming Soon)',
                 );
                 return undefined;
-            
+
             default:
                 ExtensionOutputChannel.error(
                     this.LOG_SOURCE,
-                    `Unknown projectSourceType: ${sourceType}`
+                    `Unknown projectSourceType: ${sourceType}`,
                 );
                 return undefined;
         }
@@ -73,19 +73,16 @@ export class ProjectInfoService {
      * Assumes standard WinCC OA project structure
      */
     private static async getProjectInfoFromWorkspace(
-        workspaceFolder: vscode.WorkspaceFolder
+        workspaceFolder: vscode.WorkspaceFolder,
     ): Promise<ProjectInfo | undefined> {
         const projectPath = workspaceFolder.uri.fsPath;
-        
-        ExtensionOutputChannel.trace(
-            this.LOG_SOURCE,
-            `Analyzing workspace path: ${projectPath}`
-        );
+
+        ExtensionOutputChannel.trace(this.LOG_SOURCE, `Analyzing workspace path: ${projectPath}`);
 
         // Standard WinCC OA paths (will be enhanced by npm lib)
         const configPath = path.join(projectPath, 'config');
         const logPath = path.join(projectPath, 'log');
-        
+
         // Get bin path from settings
         const config = vscode.workspace.getConfiguration('winccoaTests');
         const binPath = config.get<string>('winccoaBinPath', '');
@@ -95,12 +92,12 @@ export class ProjectInfoService {
             configPath,
             logPath,
             binPath,
-            sourceType: 'workspace'
+            sourceType: 'workspace',
         };
 
         ExtensionOutputChannel.debug(
             this.LOG_SOURCE,
-            `Project info resolved: ${JSON.stringify(projectInfo, null, 2)}`
+            `Project info resolved: ${JSON.stringify(projectInfo, null, 2)}`,
         );
 
         return projectInfo;
@@ -113,7 +110,7 @@ export class ProjectInfoService {
     public static async validateProjectInfo(info: ProjectInfo): Promise<boolean> {
         ExtensionOutputChannel.trace(
             this.LOG_SOURCE,
-            'Validating project info (basic validation - enhanced version coming with npm lib)'
+            'Validating project info (basic validation - enhanced version coming with npm lib)',
         );
 
         // Basic validation
@@ -136,12 +133,12 @@ export class ProjectInfoService {
     public static async detectProjectAutomatically(): Promise<ProjectInfo | undefined> {
         ExtensionOutputChannel.info(
             this.LOG_SOURCE,
-            'Automatic project detection will be implemented via external npm library'
+            'Automatic project detection will be implemented via external npm library',
         );
-        
+
         // TODO: Call external npm lib here
         // Example: return await winccoaProjectDetector.detect();
-        
+
         return undefined;
     }
 }

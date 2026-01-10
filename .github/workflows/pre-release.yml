@@ -1,13 +1,14 @@
 name: Pre-Release (Develop)
 
 on:
-    push:
+    workflow_run:
+        workflows:
+            - "CI/CD Pipeline"
+            - "Integration Tests - WinCC OA"
+        types:
+            - completed
         branches:
             - develop
-        paths-ignore:
-            - "**.md"
-            - ".github/**"
-            - "!.github/workflows/pre-release.yml"
     workflow_dispatch:
         inputs:
             pre_release_type:
@@ -31,40 +32,10 @@ permissions:
     # This requires repository admin access or using a PAT
 
 jobs:
-    test:
-        runs-on: ubuntu-latest
-
-        strategy:
-            matrix:
-                node-version: [18.x, 20.x, 22.x]
-
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v6
-              with:
-                  fetch-depth: 0
-                  token: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Use Node.js ${{ matrix.node-version }}
-              uses: actions/setup-node@v6
-              with:
-                  node-version: ${{ matrix.node-version }}
-                  cache: "npm"
-
-            - name: Install dependencies
-              run: npm ci
-
-            - name: Build package
-              run: npm run build
-
-            - name: Run tests
-              run: npm test
-              env:
-                  CI: true
-
     pre-release:
         runs-on: ubuntu-latest
-        needs: test
+        # Only run if the triggering workflow succeeded
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
         outputs:
             version: ${{ steps.release.outputs.version }}
             changelog: ${{ steps.changelog.outputs.changelog }}
@@ -83,7 +54,7 @@ jobs:
                   cache: "npm"
 
             - name: Install dependencies
-              run: npm ci
+              run: npm install && npm ci
 
             - name: Configure Git
               run: |
@@ -181,7 +152,7 @@ jobs:
                   echo "### 🔍 Testing Notes:" >> temp_changelog.md
                   echo "- This is a **pre-release** version from the develop branch" >> temp_changelog.md
                   echo "- Use for testing and validation purposes only" >> temp_changelog.md
-                  echo "- Report issues at: https://github.com/mPokornyETM/vs-code-wincc-oa-projects-viewer/issues" >> temp_changelog.md
+                  echo "- Report issues at: https://github.com/winccoa-tools-pack/template-vscode-extension/issues" >> temp_changelog.md
 
                   # Read changelog content
                   CHANGELOG_CONTENT=$(cat temp_changelog.md)
@@ -218,18 +189,16 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Build Package
-              run: npm run build
+            - name: Package Extension
+              run: |
+                  npm install -g @vscode/vsce
+                  vsce package
 
-            - name: Upload Package Artifact
+            - name: Upload VSIX Artifact
               uses: actions/upload-artifact@v5
               with:
                   name: pre-release-${{ steps.release.outputs.version }}
-                  path: |
-                      dist/
-                      package.json
-                      README.md
-                      LICENSE
+                  path: "*.vsix"
                   retention-days: 14
 
             - name: Create GitHub Pre-Release
@@ -252,22 +221,21 @@ jobs:
 
                       ### 📦 Installation
 
-                      Install the pre-release version:
+                      **Option 1: From VSIX (Recommended for testing)**
+                      1. Download the `.vsix` file below
+                      2. Open VS Code
+                      3. Run `Extensions: Install from VSIX...`
+                      4. Select the downloaded file
 
-                      ```bash
-                      npm install @winccoa-tools-pack/core-utils@${{ steps.release.outputs.version }}
-                      ```
-
-                      Or with Yarn:
-
-                      ```bash
-                      yarn add @winccoa-tools-pack/core-utils@${{ steps.release.outputs.version }}
-                      ```
+                      **Option 2: VS Code Marketplace (if published)**
+                      - Search for "WinCC OA" with pre-release enabled
 
                       ### 🔄 Feedback
 
                       - [🐛 Report Issues](https://github.com/${{ github.repository }}/issues)
                       - [💡 Suggest Features](https://github.com/${{ github.repository }}/issues/new?template=feature_request.md)
+
+                  files: "*.vsix"
 
                   draft: false
                   prerelease: true
@@ -308,7 +276,7 @@ jobs:
             - name: Success Notification
               run: |
                   echo "🧪 Pre-release v${{ needs.pre-release.outputs.version }} created successfully!"
-                  echo "📦 Package built and uploaded to GitHub Releases"
+                  echo "📦 Extension packaged and uploaded to GitHub Releases"
                   echo "🔍 Available for testing and validation"
                   echo "📝 Auto-generated from develop branch"
                   echo ""

@@ -1,0 +1,32 @@
+
+name: Sync organization files to repositories
+
+on:
+  schedule:
+    - cron: "15 6 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    # Correct reference and use a valid ref (main or a tag)
+    uses: winccoa-tools-pack/.github/.github/workflows/template-sync-reusable.yml@main
+    with:
+      template_repo: "winccoa-tools-pack/.github"
+      template_ref:  "main"
+      sync_mode:     "update"
+      paths: |
+        .github/workflows/sync-org-files.yml
+        SECURITY.md
+        FUNDING.yml
+        LICENSE
+        # Add more paths you want from the org .github repo
+      pr_title:  "chore(template): sync gh org files to repository"
+      pr_body:   "Automated sync from org template repository."
+      pr_labels: "sync, automated"
+   #   pr_reviewers: "REPLACE_WITH_REAL_USERS_OR_TEAMS"
+      branch_prefix: "chore/org-sync"
+    secrets: inherit

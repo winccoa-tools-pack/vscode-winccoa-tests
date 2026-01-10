@@ -1,0 +1,128 @@
+{
+  "Environment": {
+    "TestVersion": "1.0",
+    "Version": "1.0",
+    "Hostname": "unit-test",
+    "SystemEnvironment": {}
+  },
+  "Time": {
+    "Start": "2026.01.01 10:00:00.000",
+    "End": "2026.01.01 10:20:00.000"
+  },
+  "TestManager": {
+    "ProgName": "WCCOActrl",
+    "Num": "1",
+    "Type": "unit",
+    "Id": "tm_01"
+  },
+  "Statistic": {
+    "Aborted": 1,
+    "Failed": 2,
+    "Passed": 4
+  },
+  "TestCases": [
+    {
+      "TcId": "tc_01_pass_only",
+      "Result": "Pass",
+      "Note": "PASS #1",
+      "StartTimeStamp": "2026.01.01 10:00:01.000",
+      "EndTimeStamp": "2026.01.01 10:00:01.100",
+      "Duration": 100,
+      "Method": "assertTrue",
+      "Location": "Script: C:\\pvss\\scripts\\tc_01.ctl\nLibrary: C:\\pvss\\libs\\OaTestBase.ctl\nLine: 10",
+      "StackTrace": [
+        "int tc_01::run() at C:\\pvss\\scripts\\tc_01.ctl:10"
+      ],
+      "ErrMsg": ""
+    },
+    {
+      "TcId": "tc_01_pass_only",
+      "Result": "Pass",
+      "Note": "PASS #2",
+      "StartTimeStamp": "2026.01.01 10:00:02.000",
+      "EndTimeStamp": "2026.01.01 10:00:02.050",
+      "Duration": 50,
+      "Method": "assertEqual",
+      "Location": "Script: C:\\pvss\\scripts\\tc_01.ctl\nLibrary: C:\\pvss\\libs\\OaTestBase.ctl\nLine: 20",
+      "StackTrace": [
+        "int tc_01::run() at C:\\pvss\\scripts\\tc_01.ctl:20"
+      ],
+      "ErrMsg": ""
+    },
+    {
+      "TcId": "tc_02_single_fail",
+      "Result": "Fail",
+      "Note": "FAIL: 1 != 0 (single fail testcase)",
+      "StartTimeStamp": "2026.01.01 10:05:01.000",
+      "EndTimeStamp": "2026.01.01 10:05:01.200",
+      "Duration": 200,
+      "Method": "assertEqual",
+      "Location": "Script: C:\\pvss\\scripts\\logger.ctl\nLibrary: C:\\pvss\\libs\\OaTestBase.ctl\nLine: 503",
+      "StackTrace": [
+        "int logger::assertEqual(int,int) at C:\\pvss\\scripts\\logger.ctl:79",
+        "int OaTestBase::run() at C:\\pvss\\libs\\OaTestBase.ctl:500"
+      ],
+      "ErrMsg": "assertion failed",
+      "CurrentValue": 1,
+      "ReferenceValue": 0
+    },
+    {
+      "TcId": "tc_02_single_fail",
+      "Result": "Pass",
+      "Note": "PASS after fail (should still be logged)",
+      "StartTimeStamp": "2026.01.01 10:05:02.000",
+      "EndTimeStamp": "2026.01.01 10:05:02.050",
+      "Duration": 50,
+      "Method": "cleanup",
+      "Location": "Script: C:\\pvss\\scripts\\logger.ctl\nLibrary: C:\\pvss\\libs\\OaTestBase.ctl\nLine: 510",
+      "StackTrace": [
+        "int logger::cleanup() at C:\\pvss\\scripts\\logger.ctl:510"
+      ],
+      "ErrMsg": ""
+    },
+    {
+      "TcId": "tc_03_pass_then_fail",
+      "Result": "Pass",
+      "Note": "PASS before fail",
+      "StartTimeStamp": "2026.01.01 10:06:00.000",
+      "EndTimeStamp": "2026.01.01 10:06:00.010",
+      "Duration": 10,
+      "Method": "assertTrue",
+      "Location": "Script: C:\\pvss\\scripts\\tc_03.ctl\nLibrary: C:\\pvss\\libs\\OaTestBase.ctl\nLine: 30",
+      "StackTrace": [
+        "int tc_03::run() at C:\\pvss\\scripts\\tc_03.ctl:30"
+      ],
+      "ErrMsg": ""
+    },
+    {
+      "TcId": "tc_03_pass_then_fail",
+      "Result": "Fail",
+      "Note": "FAIL after pass",
+      "StartTimeStamp": "2026.01.01 10:06:01.000",
+      "EndTimeStamp": "2026.01.01 10:06:01.020",
+      "Duration": 20,
+      "Method": "assertEqual",
+      "Location": "Script: C:\\pvss\\scripts\\tc_03.ctl\nLibrary: C:\\pvss\\libs\\OaTestBase.ctl\nLine: 40",
+      "StackTrace": [
+        "int tc_03::run() at C:\\pvss\\scripts\\tc_03.ctl:40"
+      ],
+      "ErrMsg": "mismatch",
+      "CurrentValue": "A",
+      "ReferenceValue": "B"
+    },
+    {
+      "TcId": "tc_10_abort_explicit_unknownFunction_note",
+      "Result": "Aborted",
+      "Note": "unknownFunction",
+      "StartTimeStamp": "2026.01.01 10:15:03.000",
+      "EndTimeStamp": "2026.01.01 10:15:03.001",
+      "Duration": 1,
+      "Method": "unknownFunction",
+      "Location": "Script: C:\\pvss\\scripts\\tc_10.ctl\nLibrary: C:\\pvss\\libs\\OaTestBase.ctl\nLine: 99",
+      "StackTrace": [
+        "int startAll() at C:\\pvss\\libs\\OaTestBase.ctl:1"
+      ],
+      "ErrMsg": "ABORTED testcase (simulated unknownFunction)"
+    }
+  ]
+}

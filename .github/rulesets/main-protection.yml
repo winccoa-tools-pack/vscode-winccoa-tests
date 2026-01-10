@@ -24,7 +24,6 @@ rules:
     parameters:
       strict_required_status_checks_policy: true
       required_status_checks:
-        - context: "test (18.x)"
         - context: "test (20.x)"
         - context: "package"
 

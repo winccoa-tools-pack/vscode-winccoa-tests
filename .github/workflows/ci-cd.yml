@@ -41,7 +41,7 @@ jobs:
       run: npm run format:check
       
     - name: Run vscode tests
-      run: npm run vscode-test
+      run: npm run test
       env:
         CI: true
         

@@ -208,7 +208,10 @@ export class JsonResultParser {
             // Track overall status (aborted has highest priority, then failed)
             if (entry.Result === 'Aborted') {
                 overallStatus = 'aborted';
-            } else if ((entry.Result === 'Fail' || entry.Result === 'KnownBug') && overallStatus !== 'aborted') {
+            } else if (
+                (entry.Result === 'Fail' || entry.Result === 'KnownBug') &&
+                overallStatus !== 'aborted'
+            ) {
                 overallStatus = 'failed';
             }
 
@@ -321,10 +324,7 @@ export class JsonResultParser {
     }
 
     // Create a VS Code TestMessage when available; otherwise a lightweight fallback.
-    private static createTestMessage(
-        text: string,
-        location?: vscode.Location,
-    ): vscode.TestMessage {
+    private static createTestMessage(text: string, location?: vscode.Location): vscode.TestMessage {
         const TestMessageCtor = (vscode as unknown as { TestMessage?: unknown }).TestMessage;
         if (typeof TestMessageCtor === 'function') {
             const msg = new (TestMessageCtor as new (message: string) => vscode.TestMessage)(text);
@@ -393,7 +393,11 @@ export class JsonResultParser {
         const stackTrace = entry.StackTrace ?? [];
 
         // 1) Preferred: use StackTrace frame that matches Location's Script path
-        if (stackTrace.length > 0 && typeof entry.Location === 'string' && entry.Location.length > 0) {
+        if (
+            stackTrace.length > 0 &&
+            typeof entry.Location === 'string' &&
+            entry.Location.length > 0
+        ) {
             const scriptMatch = entry.Location.match(/Script:\s*(.+?)(?:\n|$)/);
             if (scriptMatch) {
                 const scriptPath = scriptMatch[1].trim();

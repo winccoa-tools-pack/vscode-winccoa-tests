@@ -31,14 +31,17 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
-    - name: Build package
-      run: npm run build
+    - name: Compile and lint
+      run: npm run pretest
       
-    - name: Run style checks
-      run: npm run style-check
+    - name: Run mnarkdown linting
+      run: npm run lint:md
       
-    - name: Run unit tests
-      run: npm run test:unit
+    - name: Run format check
+      run: npm run format:check
+      
+    - name: Run vscode tests
+      run: npm run vscode-test
       env:
         CI: true
         

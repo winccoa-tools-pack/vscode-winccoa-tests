@@ -134,7 +134,9 @@
     "lint:md:fix": "markdownlint \"**/*.md\" --ignore node_modules --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "test": "vscode-test"
+    "test": "vscode-test --suite unit",
+    "test:integrationt": "vscode-test --suite integration",
+    "ci:integration": "npm ci && npm run compile && npm run test:integrationt"
   },
   "devDependencies": {
     "@types/vscode": "^1.108.0",

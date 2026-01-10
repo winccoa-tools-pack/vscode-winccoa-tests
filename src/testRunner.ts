@@ -96,7 +96,7 @@ export class TestRunner {
             const executable = process.platform === 'win32' ? 'WCCOActrl.exe' : 'WCCOActrl';
             const fullExecutablePath = path.normalize(installPath + '/bin/' + executable);
             const scriptPath = fileUri.fsPath;
-            const args = [scriptPath, '-proj', projectName, '-n'];
+            const args = [scriptPath, '-proj', projectName];
 
             // Spawn process
             const child = spawn(fullExecutablePath, args, { stdio: 'ignore' });
@@ -245,7 +245,7 @@ export class TestRunner {
             const executable = process.platform === 'win32' ? 'WCCOActrl.exe' : 'WCCOActrl';
             const fullExecutablePath = path.normalize(installPath + '/bin/' + executable);
             const scriptPath = fileUri.fsPath;
-            const args = [scriptPath, '-proj', projectName, '-n', testCaseId];
+            const args = [scriptPath, '-proj', projectName, testCaseId];
 
             // Spawn process
             const child = spawn(fullExecutablePath, args, { stdio: 'ignore' });

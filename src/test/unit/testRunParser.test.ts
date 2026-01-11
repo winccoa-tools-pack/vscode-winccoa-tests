@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import * as path from 'path';
+import * as fs from 'fs';
 import { TestRunParser } from '../../testRunParser.js';
 
 suite('TestRunParser Unit Tests', () => {
@@ -9,6 +10,20 @@ suite('TestRunParser Unit Tests', () => {
 
     test('Parse pass-only test', async () => {
         const logPath = path.join(fixturesPath, 'pass-only.log');
+        console.log('DEBUG: __dirname =', __dirname);
+        console.log('DEBUG: fixturesPath =', fixturesPath);
+        console.log('DEBUG: logPath =', logPath);
+        console.log('DEBUG: file exists?', fs.existsSync(logPath));
+        if (fs.existsSync(fixturesPath)) {
+            console.log('DEBUG: ALL files in fixtures:', fs.readdirSync(fixturesPath));
+        }
+        console.log('DEBUG: Current working directory:', process.cwd());
+        // Check if copyfiles ran
+        const srcFixtures = path.resolve(process.cwd(), 'src/test/fixtures');
+        console.log('DEBUG: src fixtures exist?', fs.existsSync(srcFixtures));
+        if (fs.existsSync(srcFixtures)) {
+            console.log('DEBUG: src fixtures files:', fs.readdirSync(srcFixtures).filter(f => f.endsWith('.log')));
+        }
         const result = await TestRunParser.parseTestRun(logPath, ['tc_01_pass_only']);
 
         assert.strictEqual(result.testCases.size, 1, 'Should find 1 test case');

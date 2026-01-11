@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.10] - 2026-01-11
+
+### Fixed
+
+- **Test Fixture Path**: Fixed TestRunParser tests reading from correct compiled output path
+  - Changed fixture path from `src/test/fixtures/` to `out/test/fixtures/`
+  - All 24 unit tests now passing in CI
+
 ## [1.0.9] - 2026-01-11
 
 ### Fixed

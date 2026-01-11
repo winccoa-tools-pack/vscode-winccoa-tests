@@ -2,7 +2,7 @@
   "name": "winccoa-vscode-tests",
   "displayName": "WinCC OA Test Explorer",
   "description": "Test Explorer integration for WinCC OA unit tests in Visual Studio Code",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "publisher": "winccoa-tools-pack",
   "author": "Richard Janisch",
   "license": "MIT",

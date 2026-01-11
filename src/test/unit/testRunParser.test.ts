@@ -22,7 +22,10 @@ suite('TestRunParser Unit Tests', () => {
         const srcFixtures = path.resolve(process.cwd(), 'src/test/fixtures');
         console.log('DEBUG: src fixtures exist?', fs.existsSync(srcFixtures));
         if (fs.existsSync(srcFixtures)) {
-            console.log('DEBUG: src fixtures files:', fs.readdirSync(srcFixtures).filter(f => f.endsWith('.log')));
+            console.log(
+                'DEBUG: src fixtures files:',
+                fs.readdirSync(srcFixtures).filter((f) => f.endsWith('.log')),
+            );
         }
         const result = await TestRunParser.parseTestRun(logPath, ['tc_01_pass_only']);
 

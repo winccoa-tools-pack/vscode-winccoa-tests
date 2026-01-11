@@ -100,6 +100,11 @@ suite('Location Parsing Tests', () => {
         return { filePath, line };
     }
 
+    function normalizePathForComparison(p: string): string {
+        // Replace backslashes with forward slashes for cross-platform comparison
+        return p.replace(/\\/g, '/');
+    }
+
     async function loadResults(): Promise<Map<string, any>> {
         if (!fs.existsSync(fullResultPath)) {
             return new Map();
@@ -257,9 +262,14 @@ suite('Location Parsing Tests', () => {
         const matches = stackFrames
             .map((frame) => extractAtLocation(frame))
             .filter((v): v is { filePath: string; line: number } => !!v)
-            .filter(
-                (v) => path.basename(v.filePath) === path.basename(locPath) && v.line === locLine,
-            );
+            .filter((v) => {
+                const normalizedStackPath = normalizePathForComparison(v.filePath);
+                const normalizedLocPath = normalizePathForComparison(locPath);
+                return (
+                    path.basename(normalizedStackPath) === path.basename(normalizedLocPath) &&
+                    v.line === locLine
+                );
+            });
 
         assert.ok(
             matches.length > 0,

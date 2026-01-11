@@ -82,10 +82,14 @@ jobs:
       - name: Run tests (Linux headless)
         if: startsWith(matrix.os, 'ubuntu')
         run: xvfb-run -a npm run test
+        env:
+          CI: true
 
       - name: Run tests (non-Linux)
         if: ${{ !startsWith(matrix.os, 'ubuntu') }}
         run: npm run test
+        env:
+          CI: true
 
   package:
     runs-on: ubuntu-latest

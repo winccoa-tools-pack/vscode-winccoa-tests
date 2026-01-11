@@ -1,0 +1,32 @@
+WCCOActrl    (3), 2025.12.21 16:32:03.199, CTRL, INFO,        6/oaUnit_errors, (INFO) Testcase 'tc_10_abort_explicit_unknownFunction_note' write message: 
+  Note: Start the test case
+WCCOActrl    (3), 2025.12.21 16:32:03.199, CTRL, INFO,        6/oaUnit_errors, (INFO) Testcase 'tc_10_abort_explicit_unknownFunction_note' write message: 
+  Note: tc_10 Arrange: produce aborted state via abort()
+WCCOActrl    (3), 2025.12.21 16:32:03.200, SYS,  INFO,        1/oaUnit_errors, (OK) Testcase 'tc_10_abort_explicit_unknownFunction_note' passed, 
+  Note: PASS before abort
+  StackTrace: 
+	int TstParserStates::startTestCase(const string &tcId) at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:247
+	int OaTestBase::startSingle(const string &testCaseId) at classes/oaTest/OaTestBase.ctl:355
+	int OaTestBase::startAll() at classes/oaTest/OaTestBase.ctl:322
+	void main() at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:283
+WCCOActrl    (3), 2025.12.21 16:32:03.200, CTRL, WARNING,    13/oaUnit_errors, (FAILED) Testcase 'tc_10_abort_explicit_unknownFunction_note' failed, actual value (1) is NOT equal to expected value (0), 
+  Note: FAIL before abort
+  StackTrace: 
+	int TstParserStates::startTestCase(const string &tcId) at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:248
+	int OaTestBase::startSingle(const string &testCaseId) at classes/oaTest/OaTestBase.ctl:355
+	int OaTestBase::startAll() at classes/oaTest/OaTestBase.ctl:322
+	void main() at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:283, 
+    Script: /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl
+    Library: /opt/WinCC_OA/3.20/scripts/libs/classes/oaTest/OaTestBase.ctl
+    Line: 503
+WCCOActrl    (3), 2025.12.21 16:32:03.200, CTRL, SEVERE,      2/oaUnit_errors, (ABORTED) Testcase 'tc_10_abort_explicit_unknownFunction_note' aborted, 
+  ErrMsg: ABORTED testcase (simulated unknownFunction)
+  Note: unknownFunction
+  StackTrace: 
+	int TstParserStates::startTestCase(const string &tcId) at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:253
+	int OaTestBase::startSingle(const string &testCaseId) at classes/oaTest/OaTestBase.ctl:355
+	int OaTestBase::startAll() at classes/oaTest/OaTestBase.ctl:322
+	void main() at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:283, 
+    Script: /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl
+    Library: /opt/WinCC_OA/3.20/scripts/libs/classes/oaTest/OaTestBase.ctl
+    Line: 654

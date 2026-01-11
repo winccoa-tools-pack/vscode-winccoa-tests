@@ -2,7 +2,7 @@
   "name": "winccoa-vscode-tests",
   "displayName": "WinCC OA Test Explorer",
   "description": "Test Explorer integration for WinCC OA unit tests in Visual Studio Code",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "publisher": "winccoa-tools-pack",
   "author": "Richard Janisch",
   "license": "MIT",
@@ -126,6 +126,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
+    "build": "npm run compile",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint \"src/**/*.ts\"",
@@ -134,7 +135,9 @@
     "lint:md:fix": "markdownlint \"**/*.md\" --ignore node_modules --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "test": "vscode-test"
+    "style-check": "npm run format:check && npm run lint",
+    "test": "vscode-test",
+    "test:unit": "npm test"
   },
   "devDependencies": {
     "@types/vscode": "^1.108.0",

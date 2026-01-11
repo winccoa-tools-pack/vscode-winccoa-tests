@@ -37,11 +37,16 @@ suite('JsonResultParser Real Examples', () => {
                 fs.copyFileSync(exampleFile, path.join(tmpRoot, 'fullResult.json'));
                 const results = await JsonResultParser.parseResults(tmpRoot);
 
-                assert.ok(results.size > 0, `Expected parsed results for ${path.basename(exampleFile)}`);
+                assert.ok(
+                    results.size > 0,
+                    `Expected parsed results for ${path.basename(exampleFile)}`,
+                );
 
                 let foundLocation = false;
                 for (const testCase of results.values()) {
-                    const assertion = testCase.assertions?.find((a: any) => a.location?.uri?.fsPath);
+                    const assertion = testCase.assertions?.find(
+                        (a: any) => a.location?.uri?.fsPath,
+                    );
                     if (assertion) {
                         foundLocation = true;
                         break;

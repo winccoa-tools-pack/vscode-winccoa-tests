@@ -139,7 +139,7 @@
     "test": "vscode-test",
     "test:unit": "npm test",
     "test:integrationt": "vscode-test --suite integration",
-    "ci:integration": "npm ci && npm run compile && npm run test:integrationt"
+    "ci:integration": "npm ci && npm run compile && npm run test:integrationt",
     "style-check": "npm run format:check && npm run lint"
   },
   "devDependencies": {

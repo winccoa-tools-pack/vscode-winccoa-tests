@@ -351,9 +351,15 @@ export class JsonResultParser {
             typeof vscodeShape.Location === 'function';
 
         if (hasVscodeLocationApi) {
-            const uri = vscode.Uri.file(filePath);
-            const position = new vscode.Position(lineNum1Based - 1, 0); // VS Code uses 0-based
-            return new vscode.Location(uri, position);
+            try {
+                const uri = vscode.Uri.file(filePath);
+                const position = new vscode.Position(lineNum1Based - 1, 0); // VS Code uses 0-based
+                return new vscode.Location(uri, position);
+            } catch {
+                // Some fixtures contain Windows paths (e.g. C:\\...) and VS Code's Uri.file()
+                // may throw on non-Windows runners. For test parsing we fall back to a
+                // lightweight location-like object.
+            }
         }
 
         return {

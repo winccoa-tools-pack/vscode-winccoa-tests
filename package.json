@@ -129,16 +129,18 @@
     "copy-fixtures": "copyfiles -u 1 \"src/test/fixtures/**/*\" out/",
     "build": "npm run compile",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
+    "pretest": "npm run compile && npm run lint && npm run lint:md && npm run format:check",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "lint:md": "markdownlint \"**/*.md\" --ignore node_modules",
     "lint:md:fix": "markdownlint \"**/*.md\" --ignore node_modules --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "style-check": "npm run format:check && npm run lint",
     "test": "vscode-test",
-    "test:unit": "npm test"
+    "test:unit": "npm test",
+    "test:integrationt": "vscode-test --suite integration",
+    "ci:integration": "npm ci && npm run compile && npm run test:integrationt",
+    "style-check": "npm run format:check && npm run lint"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

@@ -37,4 +37,5 @@ npm test
 ```
 
 Notes:
+
 - The tests validate general invariants (locations parse, line numbers match stack traces), so they should work across different TcIds.

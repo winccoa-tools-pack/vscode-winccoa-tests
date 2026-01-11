@@ -2,7 +2,7 @@
   "name": "winccoa-vscode-tests",
   "displayName": "WinCC OA Test Explorer",
   "description": "Test Explorer integration for WinCC OA unit tests in Visual Studio Code",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "publisher": "winccoa-tools-pack",
   "author": "Richard Janisch",
   "license": "MIT",
@@ -125,7 +125,8 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && npm run copy-fixtures",
+    "copy-fixtures": "copyfiles -u 1 'src/test/fixtures/**/*' out/",
     "build": "npm run compile",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
@@ -140,10 +141,12 @@
     "test:unit": "npm test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.108.0",
     "@eslint/js": "^9.39.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
+    "@types/vscode": "^1.108.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.1",
     "@winccoa-tools-pack/npm-winccoa-core": "^0.1.1",
     "copyfiles": "^2.4.1",
@@ -157,8 +160,6 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.51.0",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
     "webpack": "^5.97.1",
     "webpack-cli": "^5.1.4"
   }

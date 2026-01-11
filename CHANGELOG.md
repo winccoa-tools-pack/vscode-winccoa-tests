@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - 2026-01-11
+
+### Fixed
+
+- **Test Fixtures**: Copy test fixtures to out/ directory during build
+  - Fixes TestRunParser tests failing in CI due to missing fixture files
+  - Added copy-fixtures script using copyfiles package
+- **CI Test Filtering**: Integration tests now skipped in CI (require WinCC OA installation)
+  - test-project-helpers.test.ts marked with skipInCI pattern
+
+### Added
+
+- **copyfiles** dependency for cross-platform file copying during build
+
 ## [1.0.8] - 2026-01-11
 
 ### Fixed

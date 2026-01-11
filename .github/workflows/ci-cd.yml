@@ -38,7 +38,7 @@ jobs:
       run: npm run style-check
       
     - name: Run unit tests
-      run: npm run test:unit
+      run: xvfb-run -a npm run test:unit
       env:
         CI: true
         

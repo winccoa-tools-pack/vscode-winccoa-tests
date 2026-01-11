@@ -1,0 +1,18 @@
+WCCOActrl    (3), 2025.12.21 16:32:03.173, CTRL, INFO,        6/oaUnit_errors, (INFO) Testcase 'tc_01_pass_only' write message: 
+  Note: Start the test case
+WCCOActrl    (3), 2025.12.21 16:32:03.173, CTRL, INFO,        6/oaUnit_errors, (INFO) Testcase 'tc_01_pass_only' write message: 
+  Note: tc_01 Arrange: dummy values
+WCCOActrl    (3), 2025.12.21 16:32:03.174, SYS,  INFO,        1/oaUnit_errors, (OK) Testcase 'tc_01_pass_only' passed, 
+  Note: pass: int equal
+  StackTrace: 
+	int TstParserStates::startTestCase(const string &tcId) at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:57
+	int OaTestBase::startSingle(const string &testCaseId) at classes/oaTest/OaTestBase.ctl:355
+	int OaTestBase::startAll() at classes/oaTest/OaTestBase.ctl:322
+	void main() at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:283
+WCCOActrl    (3), 2025.12.21 16:32:03.174, SYS,  INFO,        1/oaUnit_errors, (OK) Testcase 'tc_01_pass_only' passed, 
+  Note: pass: int not equal
+  StackTrace: 
+	int TstParserStates::startTestCase(const string &tcId) at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:58
+	int OaTestBase::startSingle(const string &testCaseId) at classes/oaTest/OaTestBase.ctl:355
+	int OaTestBase::startAll() at classes/oaTest/OaTestBase.ctl:322
+	void main() at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:283

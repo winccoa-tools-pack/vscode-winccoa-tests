@@ -1,0 +1,31 @@
+WCCOActrl    (3), 2025.12.21 16:32:03.182, CTRL, INFO,        6/oaUnit_errors, (INFO) Testcase 'tc_04_multi_fail_same_tc' write message: 
+  Note: Start the test case
+WCCOActrl    (3), 2025.12.21 16:32:03.183, CTRL, INFO,        6/oaUnit_errors, (INFO) Testcase 'tc_04_multi_fail_same_tc' write message: 
+  Note: tc_04 Arrange: multiple failures in a single test case
+WCCOActrl    (3), 2025.12.21 16:32:03.183, CTRL, WARNING,    13/oaUnit_errors, (FAILED) Testcase 'tc_04_multi_fail_same_tc' failed, actual value (5) is NOT equal to expected value (7), 
+  Note: FAIL #1: 5 != 7
+  StackTrace: 
+	int TstParserStates::startTestCase(const string &tcId) at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:120
+	int OaTestBase::startSingle(const string &testCaseId) at classes/oaTest/OaTestBase.ctl:355
+	int OaTestBase::startAll() at classes/oaTest/OaTestBase.ctl:322
+	void main() at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:283, 
+    Script: /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl
+    Library: /opt/WinCC_OA/3.20/scripts/libs/classes/oaTest/OaTestBase.ctl
+    Line: 503
+WCCOActrl    (3), 2025.12.21 16:32:03.184, CTRL, WARNING,    18/oaUnit_errors, (FAILED) Testcase 'tc_04_multi_fail_same_tc' failed, actual value (5) is NOT higher than minimum limit 7, 
+  Note: FAIL #2: 5 is not greater than 7
+  StackTrace: 
+	int TstParserStates::startTestCase(const string &tcId) at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:121
+	int OaTestBase::startSingle(const string &testCaseId) at classes/oaTest/OaTestBase.ctl:355
+	int OaTestBase::startAll() at classes/oaTest/OaTestBase.ctl:322
+	void main() at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:283, 
+    Script: /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl
+    Library: /opt/WinCC_OA/3.20/scripts/libs/classes/oaTest/OaTestBase.ctl
+    Line: 681
+WCCOActrl    (3), 2025.12.21 16:32:03.187, SYS,  INFO,        1/oaUnit_errors, (OK) Testcase 'tc_04_multi_fail_same_tc' passed, 
+  Note: PASS in the middle of multi-fail
+  StackTrace: 
+	int TstParserStates::startTestCase(const string &tcId) at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:127
+	int OaTestBase::startSingle(const string &testCaseId) at classes/oaTest/OaTestBase.ctl:355
+	int OaTestBase::startAll() at classes/oaTest/OaTestBase.ctl:322
+	void main() at /home/testus/repos/simaris-control/Src/Code/SIMARIScontrol_UnitTest/scripts/tests/libs/logger.ctl:283

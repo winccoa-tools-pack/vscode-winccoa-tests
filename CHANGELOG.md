@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.12] - 2026-01-11
+
+### Fixed
+
+- **Test Fixtures Missing in Git**: Added exception to .gitignore for test fixture `.log` files
+  - `.gitignore` had `*.log` which excluded test fixtures from repository
+  - Added `!src/test/fixtures/*.log` exception
+  - Force-added all fixture `.log` files to repository
+
 ## [1.0.11] - 2026-01-11
 
 ### Fixed

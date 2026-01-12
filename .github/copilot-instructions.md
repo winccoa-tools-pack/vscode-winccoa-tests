@@ -66,7 +66,17 @@ Der LogViewer zeigt aktuell nicht immer die neueste Änderung an, es gibt ein Pa
 Für die CTL-Language-Extension soll das Go-to-Feature für Variablen integriert werden, bevor wir den Language-Server später refactoren.
 
 Ein Bug im File-Watcher-Menü sorgt dafür, dass aktuell alle Einträge verschwinden, wenn man versucht, Dateien auszuwählen, die ignoriert werden sollen.
+### Test Explorer - Test Infrastructure TODOs
 
+**Integration Tests** (Stand: 2026-01-11):
+- ⚠️ Integration Tests aktuell in CI übersprungen (process.env.CI check)
+- 🔧 TODO: WinCC OA Mock/Stub für CI erstellen
+- 🔧 TODO: test-project-helpers.test.ts soll in CI mit Mock laufen
+- 📋 Ziel: Vollständige CI-Coverage ohne echte WinCC OA Installation
+
+**Test Fixtures**:
+- ✅ Test fixtures werden automatisch nach out/ kopiert (copyfiles)
+- ✅ TestRunParser tests laufen lokal und in CI
 ### Known Issues
 **WinCC OA Limitation**: Beim Ausführen einzelner Testfälle generiert WinCC OA aktuell keinen vollständigen Test-Report. Die Infrastruktur in den Extensions ist vorbereitet, aber die volle Funktionalität hängt von zukünftigen WinCC OA Verbesserungen ab.
 

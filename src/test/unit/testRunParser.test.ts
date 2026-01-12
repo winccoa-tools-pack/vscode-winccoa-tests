@@ -3,7 +3,9 @@ import * as path from 'path';
 import { TestRunParser } from '../../testRunParser.js';
 
 suite('TestRunParser Unit Tests', () => {
-    const fixturesPath = path.resolve(__dirname, '..', '..', '..', 'src', 'test', 'fixtures');
+    // In production (CI), fixtures are in out/test/fixtures/
+    // __dirname is out/test/unit/, so go up to out/, then test/fixtures/
+    const fixturesPath = path.resolve(__dirname, '..', 'fixtures');
 
     test('Parse pass-only test', async () => {
         const logPath = path.join(fixturesPath, 'pass-only.log');

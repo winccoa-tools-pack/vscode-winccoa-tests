@@ -6,7 +6,10 @@ import {
     withRunnableTestProject,
 } from '../test-project-helpers';
 
-describe('Test Project Helpers Example', () => {
+// Skip in CI - requires WinCC OA installation
+const describeOrSkip = process.env.CI ? describe.skip : describe;
+
+describeOrSkip('Test Project Helpers Example', () => {
     // Example 1: Manual registration and cleanup
     it('should register and unregister test project manually', async () => {
         let project;

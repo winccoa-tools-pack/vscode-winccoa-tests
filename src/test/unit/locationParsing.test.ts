@@ -100,6 +100,11 @@ suite('Location Parsing Tests', () => {
         return { filePath, line };
     }
 
+    function normalizePathForComparison(p: string): string {
+        // Replace backslashes with forward slashes for cross-platform comparison
+        return p.replace(/\\/g, '/');
+    }
+
     async function loadResults(): Promise<Map<string, any>> {
         if (!fs.existsSync(fullResultPath)) {
             return new Map();
@@ -160,7 +165,10 @@ suite('Location Parsing Tests', () => {
             if (assertion.status === 'aborted') {
                 continue;
             }
-            assert.ok(assertion.location, `Assertion ${i} should have location (status=${assertion.status})`);
+            assert.ok(
+                assertion.location,
+                `Assertion ${i} should have location (status=${assertion.status})`,
+            );
             const lineNumber = assertion.location.range.start.line + 1;
             assert.ok(lineNumber > 0, `Assertion ${i} should have valid line number`);
         }
@@ -213,7 +221,10 @@ suite('Location Parsing Tests', () => {
         assert.ok(assertionWithLocation, 'Should find at least one assertion with a location');
 
         const fsPath: string = assertionWithLocation.location.uri.fsPath;
-        assert.ok(!fsPath.includes('OaTestBase.ctl'), 'Location should not point to OaTestBase library');
+        assert.ok(
+            !fsPath.includes('OaTestBase.ctl'),
+            'Location should not point to OaTestBase library',
+        );
     });
 
     test('ParseLocation extracts correct line from Location string', async () => {
@@ -245,11 +256,20 @@ suite('Location Parsing Tests', () => {
         const locPath = location.uri.fsPath;
         const locLine = location.range.start.line + 1;
 
-        const stackFrames: string[] = assertionWithLocationAndStack.stackTrace.map((m: any) => m.message);
+        const stackFrames: string[] = assertionWithLocationAndStack.stackTrace.map(
+            (m: any) => m.message,
+        );
         const matches = stackFrames
             .map((frame) => extractAtLocation(frame))
             .filter((v): v is { filePath: string; line: number } => !!v)
-            .filter((v) => path.basename(v.filePath) === path.basename(locPath) && v.line === locLine);
+            .filter((v) => {
+                const normalizedStackPath = normalizePathForComparison(v.filePath);
+                const normalizedLocPath = normalizePathForComparison(locPath);
+                return (
+                    path.basename(normalizedStackPath) === path.basename(normalizedLocPath) &&
+                    v.line === locLine
+                );
+            });
 
         assert.ok(
             matches.length > 0,

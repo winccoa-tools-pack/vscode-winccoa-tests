@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for contributing to this template.
+Thank you for contributing to this extension.
 
 Steps:
 

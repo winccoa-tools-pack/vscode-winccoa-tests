@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.13] - 2026-01-25
+
+### Fixed
+
+- **Critical Bug**: Restored missing Test Explorer functionality
+  - extension.ts was accidentally overwritten in commit 54f3102
+  - TestController, test discovery, and all core functionality was lost
+  - Extension was completely non-functional (no Test Explorer, no output)
+  - Restored from previous working commit (b750378)
+
 ## [1.0.12] - 2026-01-11
 
 ### Fixed

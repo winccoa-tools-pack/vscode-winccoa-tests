@@ -195,7 +195,7 @@ jobs:
                   vsce package
 
             - name: Upload VSIX Artifact
-              uses: actions/upload-artifact@v6
+              uses: actions/upload-artifact@v7
               with:
                   name: pre-release-${{ steps.release.outputs.version }}
                   path: "*.vsix"

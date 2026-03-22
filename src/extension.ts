@@ -11,33 +11,36 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Initialize Test Controller
     testController = new WinCCOATestController(context);
-    
+
     // Register commands
     context.subscriptions.push(
         vscode.commands.registerCommand('winccoa-tests.refreshTests', () => {
             ExtensionOutputChannel.info('Extension', 'Refreshing tests...');
             testController?.refreshTests();
-        })
+        }),
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand('winccoa-tests.runAllTests', () => {
             ExtensionOutputChannel.info('Extension', 'Running all tests...');
             testController?.runAllTests();
-        })
+        }),
     );
 
     // Listen for configuration changes
     context.subscriptions.push(
-        vscode.workspace.onDidChangeConfiguration(e => {
+        vscode.workspace.onDidChangeConfiguration((e) => {
             if (e.affectsConfiguration('winccoaTests.logLevel')) {
                 ExtensionOutputChannel.updateLogLevel();
             }
             if (e.affectsConfiguration('winccoaTests.testDiscoveryMode')) {
-                ExtensionOutputChannel.info('Extension', 'Test discovery mode changed - refreshing tests...');
+                ExtensionOutputChannel.info(
+                    'Extension',
+                    'Test discovery mode changed - refreshing tests...',
+                );
                 testController?.refreshTests();
             }
-        })
+        }),
     );
 
     // Setup Core extension integration for automatic mode
@@ -58,14 +61,20 @@ async function setupCoreExtensionIntegration(context: vscode.ExtensionContext) {
     const discoveryMode = config.get<string>('testDiscoveryMode', 'automatic');
 
     if (discoveryMode !== 'automatic') {
-        ExtensionOutputChannel.debug('CoreIntegration', 'Not in automatic mode - Core extension integration disabled');
+        ExtensionOutputChannel.debug(
+            'CoreIntegration',
+            'Not in automatic mode - Core extension integration disabled',
+        );
         return;
     }
 
     const coreExtension = vscode.extensions.getExtension('RichardJanisch.winccoa-project-admin');
-    
+
     if (!coreExtension) {
-        ExtensionOutputChannel.warn('CoreIntegration', 'WinCC OA Core extension not found - automatic mode will fall back to workspace mode');
+        ExtensionOutputChannel.warn(
+            'CoreIntegration',
+            'WinCC OA Core extension not found - automatic mode will fall back to workspace mode',
+        );
         return;
     }
 
@@ -75,13 +84,17 @@ async function setupCoreExtensionIntegration(context: vscode.ExtensionContext) {
             await coreExtension.activate();
         } catch (error) {
             const err = error as Error;
-            ExtensionOutputChannel.error('CoreIntegration', `Failed to activate Core extension: ${err.message}`, err);
+            ExtensionOutputChannel.error(
+                'CoreIntegration',
+                `Failed to activate Core extension: ${err.message}`,
+                err,
+            );
             return;
         }
     }
 
     const coreApi = coreExtension.exports;
-    
+
     if (!coreApi || !coreApi.onDidChangeProject) {
         ExtensionOutputChannel.warn('CoreIntegration', 'Core extension API not available');
         return;
@@ -91,19 +104,31 @@ async function setupCoreExtensionIntegration(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         coreApi.onDidChangeProject((project: { name?: string } | undefined) => {
             if (project) {
-                ExtensionOutputChannel.info('CoreIntegration', `Project changed: ${project.name || 'Unknown'} - refreshing tests...`);
+                ExtensionOutputChannel.info(
+                    'CoreIntegration',
+                    `Project changed: ${project.name || 'Unknown'} - refreshing tests...`,
+                );
                 testController?.refreshTests();
             } else {
-                ExtensionOutputChannel.info('CoreIntegration', 'No project selected - clearing tests');
+                ExtensionOutputChannel.info(
+                    'CoreIntegration',
+                    'No project selected - clearing tests',
+                );
                 testController?.refreshTests();
             }
-        })
+        }),
     );
 
     const currentProject = coreApi.getCurrentProject();
     if (currentProject) {
-        ExtensionOutputChannel.info('CoreIntegration', `Connected to Core extension - current project: ${currentProject.name || 'Unknown'}`);
+        ExtensionOutputChannel.info(
+            'CoreIntegration',
+            `Connected to Core extension - current project: ${currentProject.name || 'Unknown'}`,
+        );
     } else {
-        ExtensionOutputChannel.debug('CoreIntegration', 'Connected to Core extension - no project currently selected');
+        ExtensionOutputChannel.debug(
+            'CoreIntegration',
+            'Connected to Core extension - no project currently selected',
+        );
     }
 }

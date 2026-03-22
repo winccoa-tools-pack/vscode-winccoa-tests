@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.15] - 2026-03-22
+
+### Fixed
+
+- **Output Panel Focus Stealing**: Output panel no longer automatically opens and steals focus on every error log ([#41](https://github.com/winccoa-tools-pack/vscode-winccoa-tests/issues/41))
+  - Removed auto-show on ERROR log level
+  - `show()` now uses `preserveFocus` to avoid interrupting the user's workflow
+
+## [1.0.14] - 2026-02-07
+
+### Changed
+
+- **Individual Test Execution**: Use `-ETM.oaTest.testCases=<testcase>` parameter for single test execution
+  - Changed from plain testCaseId argument to proper WinCC OA test parameter
+  - Command now: `WCCOActrl script.ctl -proj Project -ETM.oaTest.testCases=testCaseId`
+  - Previously: `WCCOActrl script.ctl -proj Project testCaseId`
+  - Requires `void main(...)` function with varargs for individual test support
+  - Parser checks for `main(...)` signature instead of `main(string ...)`
+
 ## [1.0.13] - 2026-01-25
 
 ### Fixed

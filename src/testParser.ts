@@ -42,9 +42,8 @@ export class TestParser {
     private static readonly STRING_LITERAL_PATTERN = /"([^"]+)"/g;
     // 3.20 format: public int test*() methods
     private static readonly TEST_METHOD_PATTERN = /public\s+int\s+(test\w*)\s*\(/gm;
-    // Pattern for main function with string parameter
-    private static readonly MAIN_WITH_STRING_PARAM_PATTERN =
-        /\b(void\s+)?main\s*\(\s*string\s+\w+\s*\)/;
+    // Pattern for main function with varargs (for command line arguments)
+    private static readonly MAIN_WITH_VARARGS_PATTERN = /\b(void\s+)?main\s*\(\s*\.\.\.\s*\)/;
 
     /**
      * Parse a CTRL file for test classes and test cases
@@ -346,42 +345,20 @@ export class TestParser {
     /**
      * Check if file supports individual test execution
      * Requirements:
-     * 1. main() function has string parameter: main(string testCaseId)
-     * 2. main() function contains startSingle call
+     * 1. main() function has varargs: void main(...)
+     * 2. This allows passing -ETM.oaTest.testCases=<testcase> via command line
      */
     private static checkSupportsIndividualTests(content: string): boolean {
         try {
-            // Check 1: main function with string parameter
-            if (!this.MAIN_WITH_STRING_PARAM_PATTERN.test(content)) {
-                ExtensionOutputChannel.debug(
-                    this.LOG_SOURCE,
-                    'No main(string ...) signature found',
-                );
-                return false;
-            }
-
-            // Check 2: Extract main function body and check for startSingle
-            const mainBodyMatch = content.match(/\bmain\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/);
-            if (!mainBodyMatch) {
-                ExtensionOutputChannel.debug(
-                    this.LOG_SOURCE,
-                    'Could not extract main function body',
-                );
-                return false;
-            }
-
-            const mainBody = mainBodyMatch[1];
-            if (!mainBody.includes('startSingle')) {
-                ExtensionOutputChannel.debug(
-                    this.LOG_SOURCE,
-                    'No startSingle call found in main()',
-                );
+            // Check: main function with varargs (...) for command line arguments
+            if (!this.MAIN_WITH_VARARGS_PATTERN.test(content)) {
+                ExtensionOutputChannel.debug(this.LOG_SOURCE, 'No main(...) signature found');
                 return false;
             }
 
             ExtensionOutputChannel.debug(
                 this.LOG_SOURCE,
-                'File supports individual test execution ✓',
+                'File supports individual test execution ✓ (has main(...) with varargs)',
             );
             return true;
         } catch (error) {

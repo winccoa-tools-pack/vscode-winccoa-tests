@@ -66,11 +66,6 @@ export class ExtensionOutputChannel {
         }
 
         ExtensionOutputChannel.instance.appendLine(logMessage);
-
-        // Auto-show output on errors
-        if (level === LogLevel.ERROR) {
-            ExtensionOutputChannel.instance.show(true);
-        }
     }
 
     // Public API methods
@@ -106,7 +101,7 @@ export class ExtensionOutputChannel {
 
     public static show(): void {
         if (ExtensionOutputChannel.instance) {
-            ExtensionOutputChannel.instance.show();
+            ExtensionOutputChannel.instance.show(true); // preserveFocus: don't steal focus
         }
     }
 }

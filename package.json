@@ -139,6 +139,12 @@
     "test": "vscode-test",
     "test:unit": "npm test",
     "test:integrationt": "vscode-test --suite integration",
+    "test:unit:coverage": "npm run compile && npm run clean:coverage:unitTests && vscode-test --coverage --coverage-output coverage/unitTests --coverage-reporter lcov --coverage-reporter html --coverage-reporter json-summary --coverage-reporter text-summary",
+    "test:integration:coverage": "npm run compile && npm run clean:coverage:integrationTests && echo Integration tests covered in unit tests",
+    "test:coverage": "npm run test:unit:coverage",
+    "clean:coverage": "node -e \"require('fs').rmSync('coverage',{ recursive:true, force:true, maxRetries:10, retryDelay:200 })\"",
+    "clean:coverage:integrationTests": "node -e \"require('fs').rmSync('coverage/integrationTests',{ recursive:true, force:true, maxRetries:10, retryDelay:200 })\"",
+    "clean:coverage:unitTests": "node -e \"require('fs').rmSync('coverage/unitTests',{ recursive:true, force:true, maxRetries:10, retryDelay:200 })\"",
     "ci:integration": "npm ci && npm run compile && npm run test:integrationt",
     "style-check": "npm run format:check && npm run lint"
   },

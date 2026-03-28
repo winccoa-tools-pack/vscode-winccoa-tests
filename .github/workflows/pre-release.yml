@@ -1,4 +1,4 @@
-name: Pre-Release (Develop)
+﻿name: Pre-Release (Develop)
 
 on:
     workflow_run:
@@ -10,16 +10,7 @@ on:
         branches:
             - develop
     workflow_dispatch:
-        inputs:
-            pre_release_type:
-                description: "Pre-release type"
-                required: true
-                default: "alpha"
-                type: choice
-                options:
-                    - alpha
-                    - beta
-                    - rc
+        inputs: {}
 
 permissions:
     contents: write
@@ -28,258 +19,23 @@ permissions:
     actions: write
     checks: write
     issues: write
-    # Need to bypass branch protection for automated version commits
-    # This requires repository admin access or using a PAT
 
 jobs:
     pre-release:
-        runs-on: ubuntu-latest
-        # Only run if the triggering workflow succeeded
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-        outputs:
-            version: ${{ steps.release.outputs.version }}
-            changelog: ${{ steps.changelog.outputs.changelog }}
+        if: |
+            github.event_name == 'workflow_dispatch' ||
+            github.event.workflow_run.conclusion == 'success'
+        uses: winccoa-tools-pack/.github/.github/workflows/reusable-prerelease.yml@main
+        with:
+            target_branch: develop
+            project_type: vscode
+        secrets: inherit
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v6
-              with:
-                  fetch-depth: 0
-                  token: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Use Node.js 20.x
-              uses: actions/setup-node@v6
-              with:
-                  node-version: 20.x
-                  cache: "npm"
-
-            - name: Install dependencies
-              run: npm install && npm ci
-
-            - name: Configure Git
-              run: |
-                  git config --global user.name 'github-actions[bot]'
-                  git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-                  # Configure authentication for tag pushing
-                  git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-
-            - name: Install standard-version
-              run: npm install -g standard-version
-
-            - name: Detect Pre-Release Type
-              id: detect-type
-              run: |
-                  PRE_RELEASE_TYPE=""
-
-                  if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-                    PRE_RELEASE_TYPE="${{ github.event.inputs.pre_release_type }}"
-                    echo "Manual pre-release type: $PRE_RELEASE_TYPE"
-                  else
-                    # Auto-detect based on commit messages or use alpha as default
-                    RECENT_COMMITS=$(git log --oneline -10)
-
-                    if echo "$RECENT_COMMITS" | grep -qi "beta\|release candidate\|rc"; then
-                      PRE_RELEASE_TYPE="beta"
-                      echo "🚀 Beta release detected from commits"
-                    elif echo "$RECENT_COMMITS" | grep -qi "release\|stable"; then
-                      PRE_RELEASE_TYPE="rc"
-                      echo "🎯 Release candidate detected from commits"
-                    else
-                      PRE_RELEASE_TYPE="alpha"
-                      echo "🧪 Alpha pre-release (default for develop)"
-                    fi
-                  fi
-
-                  echo "pre-release-type=$PRE_RELEASE_TYPE" >> $GITHUB_OUTPUT
-
-            - name: Create Pre-Release
-              id: release
-              run: |
-                  PRE_RELEASE_TYPE="${{ steps.detect-type.outputs.pre-release-type }}"
-
-                  # Get current version and increment for pre-release
-                  CURRENT_VERSION=$(node -p "require('./package.json').version")
-                  echo "Current version: $CURRENT_VERSION"
-
-                  # Generate pre-release version
-                  TIMESTAMP=$(date +%Y%m%d%H%M)
-                  SHORT_SHA=$(git rev-parse --short HEAD)
-
-                  # Increment patch version and add pre-release identifier
-                  npm version prerelease --preid="$PRE_RELEASE_TYPE.$TIMESTAMP.$SHORT_SHA" --no-git-tag-version
-
-                  NEW_VERSION=$(node -p "require('./package.json').version")
-                  echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-                  echo "New pre-release version: $NEW_VERSION"
-
-                  # Create tag locally (delete if exists)
-                  if git rev-parse "v$NEW_VERSION" >/dev/null 2>&1; then
-                    echo "⚠️ Tag v$NEW_VERSION already exists, deleting it first"
-                    git tag -d "v$NEW_VERSION"
-                  fi
-                  git tag "v$NEW_VERSION"
-                  echo "📌 Created pre-release tag: v$NEW_VERSION"
-
-                  # Stage package.json changes
-                  git add package.json
-                  echo "📝 Pre-release version updated"
-
-            - name: Generate Pre-Release Changelog
-              id: changelog
-              run: |
-                  VERSION="${{ steps.release.outputs.version }}"
-
-                  # Generate changelog from recent commits
-                  echo "## 🧪 Pre-Release v$VERSION" > temp_changelog.md
-                  echo "" >> temp_changelog.md
-                  echo "**Pre-release from develop branch**" >> temp_changelog.md
-                  echo "" >> temp_changelog.md
-                  echo "### Recent Changes:" >> temp_changelog.md
-
-                  # Get commits since last release
-                  LAST_TAG=$(git describe --tags --abbrev=0 --match="v*" 2>/dev/null || echo "")
-
-                  if [ -n "$LAST_TAG" ]; then
-                    echo "Generating changelog since $LAST_TAG..."
-                    git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges >> temp_changelog.md
-                  else
-                    echo "No previous tags found, using last 10 commits..."
-                    git log --pretty=format:"- %s (%h)" --no-merges -10 >> temp_changelog.md
-                  fi
-
-                  echo "" >> temp_changelog.md
-                  echo "" >> temp_changelog.md
-                  echo "### 🔍 Testing Notes:" >> temp_changelog.md
-                  echo "- This is a **pre-release** version from the develop branch" >> temp_changelog.md
-                  echo "- Use for testing and validation purposes only" >> temp_changelog.md
-                  echo "- Report issues at: https://github.com/winccoa-tools-pack/template-vscode-extension/issues" >> temp_changelog.md
-
-                  # Read changelog content
-                  CHANGELOG_CONTENT=$(cat temp_changelog.md)
-
-                  # Write to output (handle multiline content)
-                  {
-                    echo "changelog<<EOF"
-                    echo "$CHANGELOG_CONTENT"
-                    echo "EOF"
-                  } >> $GITHUB_OUTPUT
-
-                  rm temp_changelog.md
-
-            - name: Push Pre-Release Tag
-              run: |
-                  VERSION="${{ steps.release.outputs.version }}"
-
-                  # For pre-releases, we DON'T push version changes back to develop
-                  # This avoids branch protection conflicts since we don't need to commit to develop
-                  # The version bump is only in package.json for building the release artifact
-
-                  echo "ℹ️  Pre-release version $VERSION is tag-only (not committed to develop)"
-                  echo "📌 This prevents branch protection conflicts"
-                  echo "✅ The develop branch package.json remains unchanged"
-
-                  # Push tag only (no commit to develop needed)
-                  if git ls-remote --tags origin "v$VERSION" | grep -q "v$VERSION"; then
-                    echo "⚠️  Tag v$VERSION exists remotely, force pushing"
-                    git push --force origin "v$VERSION"
-                  else
-                    git push origin "v$VERSION"
-                  fi
-                  echo "✅ Pushed pre-release tag: v$VERSION"
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Package Extension
-              run: |
-                  npm install -g @vscode/vsce
-                  vsce package
-
-            - name: Upload VSIX Artifact
-              uses: actions/upload-artifact@v6
-              with:
-                  name: pre-release-${{ steps.release.outputs.version }}
-                  path: "*.vsix"
-                  retention-days: 14
-
-            - name: Create GitHub Pre-Release
-              uses: softprops/action-gh-release@v2
-              with:
-                  tag_name: "v${{ steps.release.outputs.version }}"
-                  name: "🧪 Pre-Release v${{ steps.release.outputs.version }}"
-                  target_commitish: develop
-                  body: |
-                      ${{ steps.changelog.outputs.changelog }}
-
-                      ### ⚠️ Pre-Release Warning
-
-                      This is a **pre-release** version automatically generated from the `develop` branch.
-
-                      **Use for testing purposes only:**
-                      - ✅ Test new features and changes
-                      - ✅ Validate functionality before production
-                      - ❌ Not recommended for production use
-
-                      ### 📦 Installation
-
-                      **Option 1: From VSIX (Recommended for testing)**
-                      1. Download the `.vsix` file below
-                      2. Open VS Code
-                      3. Run `Extensions: Install from VSIX...`
-                      4. Select the downloaded file
-
-                      **Option 2: VS Code Marketplace (if published)**
-                      - Search for "WinCC OA" with pre-release enabled
-
-                      ### 🔄 Feedback
-
-                      - [🐛 Report Issues](https://github.com/${{ github.repository }}/issues)
-                      - [💡 Suggest Features](https://github.com/${{ github.repository }}/issues/new?template=feature_request.md)
-
-                  files: "*.vsix"
-
-                  draft: false
-                  prerelease: true
-                  generate_release_notes: true
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Delete Old Pre-Releases
-              run: |
-                  echo "🧹 Cleaning up old pre-releases..."
-
-                  # Get all pre-releases sorted by creation date (newest first)
-                  # Use jq to sort by createdAt timestamp, not alphabetically
-                  PRERELEASES=$(gh release list --limit 100 --json tagName,isPrerelease,createdAt --jq '[.[] | select(.isPrerelease == true)] | sort_by(.createdAt) | reverse | .[].tagName')
-
-                  # Skip the first (latest) pre-release
-                  OLD_PRERELEASES=$(echo "$PRERELEASES" | tail -n +2)
-
-                  if [ -z "$OLD_PRERELEASES" ]; then
-                    echo "✅ No old pre-releases to delete"
-                  else
-                    echo "🗑️  Deleting old pre-releases:"
-                    for TAG in $OLD_PRERELEASES; do
-                      echo "  - Deleting $TAG"
-                      gh release delete "$TAG" --yes --cleanup-tag || echo "⚠️  Failed to delete $TAG"
-                    done
-                    echo "✅ Old pre-releases cleaned up, kept only: v${{ steps.release.outputs.version }}"
-                  fi
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    notify-success:
-        runs-on: ubuntu-latest
+    cleanup-old-prereleases:
         needs: [pre-release]
-        if: success()
-
-        steps:
-            - name: Success Notification
-              run: |
-                  echo "🧪 Pre-release v${{ needs.pre-release.outputs.version }} created successfully!"
-                  echo "📦 Extension packaged and uploaded to GitHub Releases"
-                  echo "🔍 Available for testing and validation"
-                  echo "📝 Auto-generated from develop branch"
-                  echo ""
-                  echo "🔗 Pre-release URL: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.pre-release.outputs.version }}"
-                  echo ""
-                  echo "🧪 Test the pre-release and provide feedback!"
+        if: always() && needs.pre-release.result == 'success'
+        uses: winccoa-tools-pack/.github/.github/workflows/reusable-cleanup-prereleases-by-branch.yml@main
+        with:
+            target_branch: develop
+            keep_latest: 3
+        secrets: inherit

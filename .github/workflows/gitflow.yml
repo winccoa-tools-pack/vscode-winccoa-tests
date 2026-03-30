@@ -11,5 +11,5 @@ permissions:
 
 jobs:
   upmerge:
-    uses: winccoa-tools-pack/.github/workflows/reusable-gitflow-upmerge.yml@main
+    uses: winccoa-tools-pack/.github/.github/workflows/reusable-gitflow-upmerge.yml@main
     secrets: inherit

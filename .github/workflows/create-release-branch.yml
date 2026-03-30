@@ -43,7 +43,7 @@ permissions:
 
 jobs:
   create:
-    uses: winccoa-tools-pack/.github/workflows/reusable-create-release-branch.yml@main
+    uses: winccoa-tools-pack/.github/.github/workflows/reusable-create-release-branch.yml@main
     with:
       kind: ${{ inputs.kind }}
       version: ${{ inputs.version }}

@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   ci-cd:
-    uses: winccoa-tools-pack/.github/workflows/reusable-ci-cd.yml@main
+    uses: winccoa-tools-pack/.github/.github/workflows/reusable-ci-cd.yml@main
     with:
       project_type: vscode
     secrets: inherit

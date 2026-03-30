@@ -1,4 +1,4 @@
-﻿name: Pre-Release (Develop)
+name: Pre-Release (Develop)
 
 on:
     workflow_run:
@@ -25,7 +25,7 @@ jobs:
         if: |
             github.event_name == 'workflow_dispatch' ||
             github.event.workflow_run.conclusion == 'success'
-        uses: winccoa-tools-pack/.github/.github/workflows/reusable-prerelease.yml@main
+        uses: winccoa-tools-pack/.github/workflows/reusable-prerelease.yml@main
         with:
             target_branch: develop
             project_type: vscode
@@ -34,7 +34,7 @@ jobs:
     cleanup-old-prereleases:
         needs: [pre-release]
         if: always() && needs.pre-release.result == 'success'
-        uses: winccoa-tools-pack/.github/.github/workflows/reusable-cleanup-prereleases-by-branch.yml@main
+        uses: winccoa-tools-pack/.github/workflows/reusable-cleanup-prereleases-by-branch.yml@main
         with:
             target_branch: develop
             keep_latest: 3

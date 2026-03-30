@@ -1,4 +1,4 @@
-﻿name: Release
+name: Release
 
 on:
     workflow_run:
@@ -25,7 +25,7 @@ jobs:
         if: |
             github.event_name == 'workflow_dispatch' ||
             github.event.workflow_run.conclusion == 'success'
-        uses: winccoa-tools-pack/.github/.github/workflows/reusable-release.yml@main
+        uses: winccoa-tools-pack/.github/workflows/reusable-release.yml@main
         with:
             target_branch: main
             project_type: vscode

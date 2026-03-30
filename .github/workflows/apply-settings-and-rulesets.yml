@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   apply:
-    uses: winccoa-tools-pack/.github/.github/workflows/reusable-apply-settings-and-rulesets.yml@main
+    uses: winccoa-tools-pack/.github/workflows/reusable-apply-settings-and-rulesets.yml@main
     with:
       mode: ${{ inputs.mode || 'apply' }}
     secrets: inherit

@@ -1,0 +1,18 @@
+name: "Release & Hotfix branch protection"
+target: "branch"
+# Start in evaluate mode to avoid blocking merges during rollout.
+enforcement: "active"
+
+conditions:
+  ref_name:
+    include:
+      - "refs/heads/release/*"
+      - "refs/heads/hotfix/*"
+    exclude: []
+
+rules:
+  - type: "non_fast_forward"
+    parameters: {}
+
+  - type: "deletion"
+    parameters: {}

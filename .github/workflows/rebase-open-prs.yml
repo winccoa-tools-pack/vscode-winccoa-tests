@@ -1,0 +1,12 @@
+name: Rebase open PRs
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  rebase-prs:
+    uses: mPokornyETM/rebase-open-prs-action/.github/workflows/rebase-open-prs.yml@v1
+    secrets:
+      GH_PAT: ${{ secrets.GH_TOKEN_PAT }}

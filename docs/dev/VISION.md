@@ -1,4 +1,4 @@
-# Development Vision - vs-code extenstion to ... WinCC OA
+# Development Vision - vs-code extension to ... WinCC OA
 
 ## 🎯 Vision Statement
 
@@ -238,7 +238,7 @@
 
 ---
 
-**Last Updated**: Januar 5, 2026  
+**Last Updated**: January 5, 2026  
 **Vision Status**: Active Development  
 **Target Release**: v1.0.0 (Q1 2026)
 

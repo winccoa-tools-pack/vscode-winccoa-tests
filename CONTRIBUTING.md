@@ -8,7 +8,7 @@ Steps:
 - Install and build: `npm install` then `npm run build`
 - Run tests (if any): `npm test`
 - Ensure TypeScript compiles: `npm run build`
-- Commit with clear messages and open a Pull Request against `main`.
+- Commit with clear messages and open a Pull Request against `develop`.
 
 Code style:
 

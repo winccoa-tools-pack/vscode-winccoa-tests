@@ -65,8 +65,8 @@ Format code properly, use clear titles, and include context.
 
 ## Quick Links
 
-- [Documentation](README.md)
+- [Documentation](../README.md)
 - [Bug Reports](../../issues)
-- [Contributing Guide](CONTRIBUTING.md)
+- [Contributing Guide](../CONTRIBUTING.md)
 
 Let's build an amazing community!

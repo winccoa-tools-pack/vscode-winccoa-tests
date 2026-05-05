@@ -1,0 +1,55 @@
+name: Create Release Branch + PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "Branch type to create"
+        required: true
+        default: "release"
+        type: choice
+        options:
+          - release
+          - hotfix
+      version:
+        description: "Release version (SemVer, e.g. 1.2.3)"
+        required: true
+        type: string
+      base_branch:
+        description: "Base branch (release: develop, hotfix: main)"
+        required: true
+        default: "develop"
+        type: string
+      target_branch:
+        description: "PR target branch (typically main)"
+        required: true
+        default: "main"
+        type: string
+      draft:
+        description: "Create PR as draft"
+        required: true
+        default: false
+        type: boolean
+      labels:
+        description: "Comma-separated labels to apply (optional)"
+        required: false
+        default: "chore,release"
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  create:
+    uses: winccoa-tools-pack/.github/.github/workflows/reusable-create-release-branch.yml@main
+    with:
+      kind: ${{ inputs.kind }}
+      version: ${{ inputs.version }}
+      base_branch: ${{ inputs.base_branch }}
+      target_branch: ${{ inputs.target_branch }}
+      draft: ${{ inputs.draft }}
+      labels: ${{ inputs.labels }}
+      project_type: vscode
+    secrets: inherit

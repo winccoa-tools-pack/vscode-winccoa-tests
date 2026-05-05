@@ -1,0 +1,17 @@
+name: "Release tag protection (v*.*.*)"
+target: "tag"
+# Start in evaluate mode to avoid blocking tag operations during rollout.
+enforcement: "active"
+
+conditions:
+  ref_name:
+    include:
+      - "refs/tags/v*.*.*"
+    exclude: []
+
+rules:
+  - type: "non_fast_forward"
+    parameters: {}
+
+  - type: "deletion"
+    parameters: {}

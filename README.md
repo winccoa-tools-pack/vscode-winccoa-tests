@@ -2,9 +2,9 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.13-blue.svg)
+![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/RichardJanisch.winccoa-vscode-tests?label=VS%20Marketplace)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![VS Code](https://img.shields.io/badge/VS%20Code-^1.106.2-007ACC.svg)
+![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.110.0-007ACC.svg)
 
 **Test Explorer integration for WinCC OA unit tests in Visual Studio Code**
 
@@ -238,7 +238,7 @@ If the extension doesn't work as expected (tests not refreshing, detection issue
 Found an issue? Please report it with:
 
 - WinCC OA version
-- Extension version (`1.0.0`)
+- Extension version (see VS Code Extensions view)
 - Test file example that reproduces the issue
 - Enable `DEBUG` logging and attach log output
 
@@ -260,7 +260,7 @@ Access via `Ctrl+Shift+P`:
 
 ## 🛠️ Requirements
 
-- **VS Code:** 1.106.2 or higher
+- **VS Code:** 1.110.0 or higher
 - **WinCC OA:** 3.19+
 - **WinCC OA Script Actions:** Extension (required for test execution)
 - **WinCC OA Control:** Extension (optional, for auto-detection)

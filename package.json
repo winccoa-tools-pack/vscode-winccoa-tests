@@ -162,13 +162,13 @@
     "glob": "^13.0.0",
     "markdownlint-cli": "^0.47.0",
     "mocha": "^11.3.0",
-    "prettier": "^3.3.3",
+    "prettier": "^3.8.3",
     "source-map": "^0.8.0-beta.0",
     "ts-loader": "^9.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.51.0",
-    "webpack": "^5.97.1",
+    "webpack": "^5.106.2",
     "webpack-cli": "^5.1.4"
   }
 }

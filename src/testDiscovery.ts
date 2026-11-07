@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ExtensionOutputChannel } from './extensionOutput.js';
-import { TestParser, ParsedTestFile } from './testParser.js';
+import { TestParser, ParsedTestFile, ClassHierarchy } from './testParser.js';
 
 export type TestDiscoveryMode = 'automatic' | 'workspace';
 
@@ -10,6 +10,7 @@ export type TestDiscoveryMode = 'automatic' | 'workspace';
  */
 export class TestDiscovery {
     private static readonly LOG_SOURCE = 'TestDiscovery';
+    private static hierarchy = new ClassHierarchy();
 
     /**
      * Get current test discovery mode from configuration
@@ -147,7 +148,7 @@ export class TestDiscovery {
             `Searching for tests in ${projectsToSearch.length} project(s)`,
         );
 
-        const testFiles: ParsedTestFile[] = [];
+        const ctlFiles: vscode.Uri[] = [];
 
         // Search in main project and all subprojects
         for (const projectDir of projectsToSearch) {
@@ -171,40 +172,10 @@ export class TestDiscovery {
             const files = await vscode.workspace.findFiles(pattern, '**/node_modules/**');
 
             ExtensionOutputChannel.trace(this.LOG_SOURCE, `  Found ${files.length} .ctl file(s)`);
-
-            for (const fileUri of files) {
-                try {
-                    // Quick check if file contains OaTest
-                    const containsOaTest = await TestParser.containsOaTest(fileUri);
-
-                    if (!containsOaTest) {
-                        ExtensionOutputChannel.trace(
-                            this.LOG_SOURCE,
-                            `    Skipping (no OaTest): ${path.basename(fileUri.fsPath)}`,
-                        );
-                        continue;
-                    }
-
-                    // Parse the file
-                    const parsedFile = await TestParser.parseFile(fileUri);
-
-                    if (parsedFile && parsedFile.testClasses.length > 0) {
-                        testFiles.push(parsedFile);
-                        ExtensionOutputChannel.trace(
-                            this.LOG_SOURCE,
-                            `    ✓ ${path.relative(scriptsPath, fileUri.fsPath)}: ${parsedFile.testClasses.length} test class(es)`,
-                        );
-                    }
-                } catch (error) {
-                    const err = error as Error;
-                    ExtensionOutputChannel.error(
-                        this.LOG_SOURCE,
-                        `Error parsing ${fileUri.fsPath}: ${err.message}`,
-                        err,
-                    );
-                }
-            }
+            ctlFiles.push(...files);
         }
+
+        const testFiles = await this.parseFiles(ctlFiles);
 
         ExtensionOutputChannel.success(
             this.LOG_SOURCE,
@@ -293,13 +264,14 @@ export class TestDiscovery {
             );
         }
 
-        const allTestFiles: ParsedTestFile[] = [];
+        const allCtlFiles: vscode.Uri[] = [];
 
         // Search in each workspace folder
         for (const folder of foldersToSearch) {
-            const testFiles = await this.discoverInFolder(folder);
-            allTestFiles.push(...testFiles);
+            allCtlFiles.push(...(await this.findCtlFilesInFolder(folder)));
         }
+
+        const allTestFiles = await this.parseFiles(allCtlFiles);
 
         ExtensionOutputChannel.success(
             this.LOG_SOURCE,
@@ -310,13 +282,11 @@ export class TestDiscovery {
     }
 
     /**
-     * Discover tests in a single workspace folder
-     * Improved to find scripts folders at any depth, not just directly under workspace root
+     * Find all .ctl files in scripts folders at any depth of a workspace folder
      */
-    private static async discoverInFolder(
+    private static async findCtlFilesInFolder(
         folder: vscode.WorkspaceFolder,
-    ): Promise<ParsedTestFile[]> {
-        const testFiles: ParsedTestFile[] = [];
+    ): Promise<vscode.Uri[]> {
         const folderPath = folder.uri.fsPath;
 
         ExtensionOutputChannel.debug(
@@ -325,54 +295,59 @@ export class TestDiscovery {
         );
 
         try {
-            // Improved strategy: Search for scripts/ folders at any depth
-            // Pattern: **/scripts/**/*.ctl finds scripts folders anywhere in the tree
             const scriptsPattern = new vscode.RelativePattern(folder, '**/scripts/**/*.ctl');
-
-            ExtensionOutputChannel.trace(this.LOG_SOURCE, `Using pattern: **/scripts/**/*.ctl`);
-
-            const ctlFiles = await vscode.workspace.findFiles(
-                scriptsPattern,
-                '**/node_modules/**', // Exclude node_modules
-            );
+            const ctlFiles = await vscode.workspace.findFiles(scriptsPattern, '**/node_modules/**');
 
             ExtensionOutputChannel.debug(
                 this.LOG_SOURCE,
                 `Found ${ctlFiles.length} .ctl file(s) in scripts folders`,
             );
-
-            // Parse each file
-            for (const fileUri of ctlFiles) {
-                // Quick check if file contains OaTest
-                const containsOaTest = await TestParser.containsOaTest(fileUri);
-
-                if (!containsOaTest) {
-                    ExtensionOutputChannel.trace(
-                        this.LOG_SOURCE,
-                        `Skipping (no OaTest): ${fileUri.fsPath}`,
-                    );
-                    continue;
-                }
-
-                // Parse the file
-                const parsedFile = await TestParser.parseFile(fileUri);
-
-                if (parsedFile && parsedFile.testClasses.length > 0) {
-                    testFiles.push(parsedFile);
-                    ExtensionOutputChannel.debug(
-                        this.LOG_SOURCE,
-                        `Added test file: ${path.basename(fileUri.fsPath)} (${parsedFile.testClasses.length} class(es))`,
-                    );
-                }
-            }
+            return ctlFiles;
         } catch (error) {
             ExtensionOutputChannel.error(
                 this.LOG_SOURCE,
                 `Error discovering tests in folder: ${folderPath}`,
                 error as Error,
             );
+            return [];
         }
+    }
 
+    /**
+     * Read all files once to build the class hierarchy, then parse the files declaring classes.
+     * Replaces the hierarchy used for incremental updates.
+     */
+    private static async parseFiles(ctlFiles: vscode.Uri[]): Promise<ParsedTestFile[]> {
+        const hierarchy = new ClassHierarchy();
+        const contents = new Map<vscode.Uri, string>();
+
+        for (const fileUri of ctlFiles) {
+            try {
+                const content = await TestParser.readContent(fileUri);
+                hierarchy.setFile(fileUri.fsPath, content);
+                contents.set(fileUri, content);
+            } catch (error) {
+                const err = error as Error;
+                ExtensionOutputChannel.error(
+                    this.LOG_SOURCE,
+                    `Error reading ${fileUri.fsPath}: ${err.message}`,
+                    err,
+                );
+            }
+        }
+        this.hierarchy = hierarchy;
+
+        const testFiles: ParsedTestFile[] = [];
+        for (const [fileUri, content] of contents) {
+            const parsedFile = TestParser.parseContent(fileUri, content, hierarchy);
+            if (parsedFile) {
+                testFiles.push(parsedFile);
+                ExtensionOutputChannel.debug(
+                    this.LOG_SOURCE,
+                    `Added test file: ${path.basename(fileUri.fsPath)} (${parsedFile.testClasses.length} class(es))`,
+                );
+            }
+        }
         return testFiles;
     }
 
@@ -395,8 +370,18 @@ export class TestDiscovery {
             return undefined;
         }
 
-        // Parse the file (will return undefined if no OaTest classes found)
-        return await TestParser.parseFile(fileUri);
+        try {
+            const content = await TestParser.readContent(fileUri);
+            this.hierarchy.setFile(fileUri.fsPath, content);
+            return TestParser.parseContent(fileUri, content, this.hierarchy);
+        } catch (error) {
+            ExtensionOutputChannel.error(
+                this.LOG_SOURCE,
+                `Failed to parse file: ${fileUri.fsPath}`,
+                error as Error,
+            );
+            return undefined;
+        }
     }
 
     /**

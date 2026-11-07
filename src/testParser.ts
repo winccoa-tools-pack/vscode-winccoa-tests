@@ -27,15 +27,47 @@ export interface ParsedTestFile {
     supportsIndividualTests: boolean;
 }
 
+const OA_TEST_BASE_CLASS = 'OaTest';
+
+/**
+ * Base classes of all CTRL classes declared in the scanned files, so test classes that
+ * inherit OaTest through fixtures (class MyTest : MyFixture, MyFixture : OaTest) are found.
+ */
+export class ClassHierarchy {
+    private readonly basesByFile = new Map<string, Map<string, string>>();
+
+    public setFile(filePath: string, content: string): void {
+        this.basesByFile.set(filePath, TestParser.findClassBases(content));
+    }
+
+    public inheritsFromOaTest(className: string, visited = new Set<string>()): boolean {
+        if (className === OA_TEST_BASE_CLASS) {
+            return true;
+        }
+        if (visited.has(className)) {
+            return false;
+        }
+        visited.add(className);
+
+        for (const bases of this.basesByFile.values()) {
+            const base = bases.get(className);
+            if (base && this.inheritsFromOaTest(base, visited)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
 /**
  * Parser for WinCC OA CTRL test files
- * Searches for classes that inherit from OaTest
+ * Searches for classes that inherit from OaTest, directly or through other classes
  */
 export class TestParser {
     private static readonly LOG_SOURCE = 'TestParser';
 
     // Regex patterns
-    private static readonly CLASS_PATTERN = /class\s+(\w+)\s*:\s*OaTest/g;
+    private static readonly CLASS_PATTERN = /\bclass\s+(\w+)\s*:\s*(\w+)/g;
     private static readonly GET_ALL_TEST_CASE_IDS_PATTERN =
         /getAllTestCaseIds\s*\(\s*\)\s*\{([^}]+)\}/s;
     private static readonly MAKE_DYN_STRING_PATTERN = /makeDynString\s*\(([\s\S]*?)\)/;
@@ -45,19 +77,23 @@ export class TestParser {
     // Pattern for main function with varargs (for command line arguments)
     private static readonly MAIN_WITH_VARARGS_PATTERN = /\b(void\s+)?main\s*\(\s*\.\.\.\s*\)/;
 
+    public static async readContent(fileUri: vscode.Uri): Promise<string> {
+        return Buffer.from(await vscode.workspace.fs.readFile(fileUri)).toString('utf-8');
+    }
+
     /**
-     * Parse a CTRL file for test classes and test cases
+     * Parse CTRL file content for test classes and test cases
      */
-    public static async parseFile(fileUri: vscode.Uri): Promise<ParsedTestFile | undefined> {
+    public static parseContent(
+        fileUri: vscode.Uri,
+        content: string,
+        hierarchy: ClassHierarchy,
+    ): ParsedTestFile | undefined {
         try {
             ExtensionOutputChannel.debug(this.LOG_SOURCE, `Parsing file: ${fileUri.fsPath}`);
 
-            // Read file content
-            const document = await vscode.workspace.openTextDocument(fileUri);
-            const content = document.getText();
-
             // Find all test classes
-            const testClasses = this.findTestClasses(content);
+            const testClasses = this.findTestClasses(content, hierarchy);
 
             if (testClasses.length === 0) {
                 ExtensionOutputChannel.trace(
@@ -103,17 +139,29 @@ export class TestParser {
     }
 
     /**
+     * Map of class name to base class name for every derived class declared in the content
+     */
+    public static findClassBases(content: string): Map<string, string> {
+        const bases = new Map<string, string>();
+        for (const match of content.matchAll(this.CLASS_PATTERN)) {
+            bases.set(match[1], match[2]);
+        }
+        return bases;
+    }
+
+    /**
      * Find all test classes in file content
      */
-    private static findTestClasses(content: string): ParsedTestClass[] {
+    public static findTestClasses(content: string, hierarchy: ClassHierarchy): ParsedTestClass[] {
         const testClasses: ParsedTestClass[] = [];
 
-        // Find all classes that inherit from OaTest
-        let match;
-        this.CLASS_PATTERN.lastIndex = 0;
-        while ((match = this.CLASS_PATTERN.exec(content)) !== null) {
+        for (const match of content.matchAll(this.CLASS_PATTERN)) {
             const className = match[1];
             const classPosition = match.index;
+
+            if (!hierarchy.inheritsFromOaTest(match[2])) {
+                continue;
+            }
 
             // Find line number
             const line = content.substring(0, classPosition).split('\n').length;
@@ -324,22 +372,6 @@ export class TestParser {
         }
 
         return undefined;
-    }
-
-    /**
-     * Quick check if file contains OaTest class (for performance)
-     */
-    public static async containsOaTest(fileUri: vscode.Uri): Promise<boolean> {
-        try {
-            const document = await vscode.workspace.openTextDocument(fileUri);
-            const content = document.getText();
-
-            // Quick check without full parsing
-            return content.includes(': OaTest') || content.includes(':OaTest');
-        } catch (error) {
-            console.error(`Error checking OaTest presence in file ${fileUri.fsPath}: ${error}`);
-            return false;
-        }
     }
 
     /**
